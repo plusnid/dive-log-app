@@ -1,0 +1,29 @@
+.photo-picker__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.photo-picker__thumb {
+  position: relative;
+  width: 96px;
+  height: 96px;
+}
+
+.photo-picker__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.photo-picker__thumb button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.35rem;
+  line-height: 1.2;
+}

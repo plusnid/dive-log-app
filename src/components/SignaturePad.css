@@ -1,0 +1,27 @@
+.signature-pad {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.signature-pad__canvas {
+  width: 100%;
+  height: 160px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  touch-action: none;
+}
+
+.signature-pad__preview {
+  width: 100%;
+  height: 160px;
+  object-fit: contain;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.signature-pad button {
+  align-self: flex-start;
+}

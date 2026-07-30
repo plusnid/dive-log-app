@@ -1,0 +1,30 @@
+.dive-log-list-item {
+  list-style: none;
+}
+
+.dive-log-list-item__button {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.dive-log-list-item__main {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.dive-log-list-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: #555;
+}
