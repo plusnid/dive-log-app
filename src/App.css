@@ -47,6 +47,46 @@
   resize: vertical;
 }
 
+.form-error {
+  color: #b3261e;
+  font-weight: 600;
+}
+
+.storage-status {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.storage-status p {
+  margin: 0.25rem 0;
+}
+
+.sync-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.sync-settings dl {
+  font-size: 0.9rem;
+}
+
+.sync-settings__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.sync-settings__disconnect-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
 .detail-subtitle {
   color: #777;
 }

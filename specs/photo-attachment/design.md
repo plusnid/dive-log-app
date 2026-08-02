@@ -33,7 +33,7 @@ interface Attachment {
 - 状態はすべて親（`DiveLogFormView`）が保持し、`PhotoPicker` はコントロールドコンポーネント。実DB操作は行わない（送信時にまとめて確定）。
 - `existingPhotos` / `newFiles` それぞれについて `URL.createObjectURL` でプレビュー用URLを生成し、`useEffect` のクリーンアップで `URL.revokeObjectURL` を確実に呼ぶ（メモリリーク防止）。
 - 表示対象は `removedExistingIds` でフィルタした `visibleExisting` + `newFiles`。
-- `<input type="file" accept="image/*" multiple capture="environment" />` で複数選択・カメラ撮影に対応。選択後は `value=''` にリセットし同じファイルの再選択を可能にする。
+- `<input type="file" accept="image/*" multiple />` で複数選択に対応（`capture` 属性は指定しない。付与するとブラウザによってはカメラが直接起動し、複数選択ができなくなるため）。選択後は `value=''` にリセットし同じファイルの再選択を可能にする。
 
 ## 表示（詳細画面）
 

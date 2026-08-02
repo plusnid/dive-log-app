@@ -26,13 +26,15 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  overscroll-behavior-y: contain;
 }
 
 #root {
   max-width: 640px;
   margin: 0 auto;
   min-height: 100svh;
-  padding: 1rem;
+  padding: 1rem calc(1rem + env(safe-area-inset-right)) calc(1rem + env(safe-area-inset-bottom))
+    calc(1rem + env(safe-area-inset-left));
 }
 
 button {
@@ -42,6 +44,8 @@ button {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.5rem 0.9rem;
+  min-height: 44px;
+  min-width: 44px;
   cursor: pointer;
 }
 

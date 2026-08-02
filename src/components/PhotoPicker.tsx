@@ -24,6 +24,11 @@ export function PhotoPicker({
   const inputRef = useRef<HTMLInputElement>(null)
   const [existingUrls, setExistingUrls] = useState<Map<number, string>>(new Map())
   const [newUrls, setNewUrls] = useState<string[]>([])
+  const [brokenPreviews, setBrokenPreviews] = useState<Set<string>>(new Set())
+
+  function handleImageError(key: string) {
+    setBrokenPreviews((prev) => new Set(prev).add(key))
+  }
 
   useEffect(() => {
     const urls = new Map<number, string>()
@@ -60,32 +65,39 @@ export function PhotoPicker({
     <div className="photo-picker">
       {(visibleExisting.length > 0 || newFiles.length > 0) && (
         <div className="photo-picker__grid">
-          {visibleExisting.map((photo) => (
-            <div className="photo-picker__thumb" key={`existing-${photo.id}`}>
-              <img src={existingUrls.get(photo.id)} alt="ダイビング写真" />
-              <button type="button" onClick={() => onRemoveExisting(photo.id)}>
-                削除
-              </button>
-            </div>
-          ))}
-          {newFiles.map((file, index) => (
-            <div className="photo-picker__thumb" key={`new-${file.name}-${index}`}>
-              <img src={newUrls[index]} alt="ダイビング写真" />
-              <button type="button" onClick={() => handleRemoveNew(index)}>
-                削除
-              </button>
-            </div>
-          ))}
+          {visibleExisting.map((photo) => {
+            const key = `existing-${photo.id}`
+            return (
+              <div className="photo-picker__thumb" key={key}>
+                {brokenPreviews.has(key) ? (
+                  <div className="photo-picker__placeholder">プレビューできない画像</div>
+                ) : (
+                  <img src={existingUrls.get(photo.id)} alt="ダイビング写真" onError={() => handleImageError(key)} />
+                )}
+                <button type="button" onClick={() => onRemoveExisting(photo.id)}>
+                  削除
+                </button>
+              </div>
+            )
+          })}
+          {newFiles.map((file, index) => {
+            const key = `new-${file.name}-${index}`
+            return (
+              <div className="photo-picker__thumb" key={key}>
+                {brokenPreviews.has(key) ? (
+                  <div className="photo-picker__placeholder">プレビューできない画像</div>
+                ) : (
+                  <img src={newUrls[index]} alt="ダイビング写真" onError={() => handleImageError(key)} />
+                )}
+                <button type="button" onClick={() => handleRemoveNew(index)}>
+                  削除
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        capture="environment"
-        onChange={handleFileChange}
-      />
+      <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFileChange} />
     </div>
   )
 }

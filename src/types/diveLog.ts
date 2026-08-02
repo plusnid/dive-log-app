@@ -3,6 +3,7 @@ export type Current = 'none' | 'weak' | 'moderate' | 'strong'
 
 export interface DiveLog {
   id?: number
+  uuid: string
   // 基本情報
   date: string
   startTime?: string
@@ -33,10 +34,11 @@ export interface DiveLog {
 
 export interface Attachment {
   id?: number
+  uuid: string
   type: 'photo' | 'signature'
   blob: Blob
   mimeType: string
   createdAt: string
 }
 
-export type DiveLogDraft = Omit<DiveLog, 'id' | 'photoIds' | 'signatureId' | 'createdAt' | 'updatedAt'>
+export type DiveLogDraft = Omit<DiveLog, 'id' | 'uuid' | 'photoIds' | 'signatureId' | 'createdAt' | 'updatedAt'>

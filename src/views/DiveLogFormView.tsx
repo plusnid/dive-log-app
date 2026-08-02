@@ -44,6 +44,7 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
   const [newFiles, setNewFiles] = useState<File[]>([])
   const [existingSignatureUrl, setExistingSignatureUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const signaturePadRef = useRef<SignaturePadHandle>(null)
 
   useEffect(() => {
@@ -92,6 +93,7 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
+    setSaveError(null)
     try {
       const signatureBlob = await signaturePadRef.current?.exportBlob()
       if (isEditing) {
@@ -104,6 +106,19 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
       } else {
         const newId = await createDiveLog(draft, newFiles, signatureBlob ?? null)
         onSaved(newId)
+      }
+    } catch (error) {
+      // 保存は必ず Dexie のトランザクションを通るため、ブラウザの QuotaExceededError（DOMException）は
+      // Dexie 自身の DexieError（`QuotaExceededError` という name を持つが DOMException ではない）に
+      // 変換される。bulk 系操作では inner にラップされる場合もあるため、そちらも見る。
+      const errorName = (error as { name?: string } | null | undefined)?.name
+      const innerName = (error as { inner?: { name?: string } } | null | undefined)?.inner?.name
+      if (errorName === 'QuotaExceededError' || innerName === 'QuotaExceededError') {
+        setSaveError(
+          '端末のストレージ容量が不足しているため保存できませんでした。不要な写真を削除するなどして空き容量を確保してから、もう一度お試しください。',
+        )
+      } else {
+        setSaveError('保存に失敗しました。もう一度お試しください。')
       }
     } finally {
       setSaving(false)
@@ -143,6 +158,7 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
           <input
             type="number"
             step="0.1"
+            inputMode="decimal"
             value={draft.maxDepth ?? ''}
             onChange={(e) => updateField('maxDepth', numberOrUndefined(e.target.value))}
           />
@@ -151,6 +167,7 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
           潜水時間 (分)
           <input
             type="number"
+            inputMode="numeric"
             value={draft.duration ?? ''}
             onChange={(e) => updateField('duration', numberOrUndefined(e.target.value))}
           />
@@ -164,6 +181,7 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
           <input
             type="number"
             step="0.1"
+            inputMode="decimal"
             value={draft.waterTemp ?? ''}
             onChange={(e) => updateField('waterTemp', numberOrUndefined(e.target.value))}
           />
@@ -173,6 +191,7 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
           <input
             type="number"
             step="0.1"
+            inputMode="decimal"
             value={draft.visibility ?? ''}
             onChange={(e) => updateField('visibility', numberOrUndefined(e.target.value))}
           />
@@ -211,6 +230,7 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
           タンク開始圧力 (bar)
           <input
             type="number"
+            inputMode="numeric"
             value={draft.tankStartPressure ?? ''}
             onChange={(e) => updateField('tankStartPressure', numberOrUndefined(e.target.value))}
           />
@@ -219,6 +239,7 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
           タンク終了圧力 (bar)
           <input
             type="number"
+            inputMode="numeric"
             value={draft.tankEndPressure ?? ''}
             onChange={(e) => updateField('tankEndPressure', numberOrUndefined(e.target.value))}
           />
@@ -228,6 +249,7 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
           <input
             type="number"
             step="0.5"
+            inputMode="decimal"
             value={draft.weight ?? ''}
             onChange={(e) => updateField('weight', numberOrUndefined(e.target.value))}
           />
@@ -265,6 +287,12 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
         </label>
         <SignaturePad ref={signaturePadRef} existingSignatureUrl={existingSignatureUrl} />
       </fieldset>
+
+      {saveError && (
+        <p className="form-error" role="alert">
+          {saveError}
+        </p>
+      )}
 
       <div className="view__actions">
         <button type="submit" disabled={saving}>

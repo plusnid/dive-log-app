@@ -4,6 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/dive-log-app/',
   plugins: [
     react(),
     VitePWA({
@@ -19,7 +20,8 @@ export default defineConfig({
         theme_color: '#0b5b7a',
         background_color: '#ffffff',
         display: 'standalone',
-        start_url: '/',
+        start_url: '/dive-log-app/',
+        scope: '/dive-log-app/',
         icons: [
           {
             src: 'icons/icon-192.png',

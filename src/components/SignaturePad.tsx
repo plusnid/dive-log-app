@@ -32,18 +32,43 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
     if (showExisting) return
     const canvas = canvasRef.current
     if (!canvas) return
-    const dpr = window.devicePixelRatio || 1
-    const rect = canvas.getBoundingClientRect()
-    canvas.width = rect.width * dpr
-    canvas.height = rect.height * dpr
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.scale(dpr, dpr)
-    ctx.lineWidth = 2.5
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.strokeStyle = '#1a1a1a'
-    emptyRef.current = true
+
+    function setupCanvas(preserveContent: boolean) {
+      const dpr = window.devicePixelRatio || 1
+      const rect = canvas!.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) return
+
+      let snapshot: HTMLCanvasElement | null = null
+      if (preserveContent && !emptyRef.current) {
+        snapshot = document.createElement('canvas')
+        snapshot.width = canvas!.width
+        snapshot.height = canvas!.height
+        snapshot.getContext('2d')?.drawImage(canvas!, 0, 0)
+      }
+
+      canvas!.width = rect.width * dpr
+      canvas!.height = rect.height * dpr
+      const ctx = canvas!.getContext('2d')
+      if (!ctx) return
+      ctx.scale(dpr, dpr)
+      ctx.lineWidth = 2.5
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.strokeStyle = '#1a1a1a'
+
+      if (snapshot) {
+        // 既存のストロークを新しいサイズに合わせて再描画する（REQ-5.5）
+        ctx.drawImage(snapshot, 0, 0, snapshot.width, snapshot.height, 0, 0, rect.width, rect.height)
+      } else {
+        emptyRef.current = true
+      }
+    }
+
+    setupCanvas(false)
+
+    const observer = new ResizeObserver(() => setupCanvas(true))
+    observer.observe(canvas)
+    return () => observer.disconnect()
   }, [showExisting])
 
   useImperativeHandle(ref, () => ({

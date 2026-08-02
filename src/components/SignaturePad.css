@@ -11,6 +11,9 @@
   border-radius: 6px;
   background: #fff;
   touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .signature-pad__preview {
@@ -20,8 +23,13 @@
   border: 1px solid #ccc;
   border-radius: 6px;
   background: #fff;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .signature-pad button {
   align-self: flex-start;
+  min-height: 44px;
+  min-width: 44px;
 }

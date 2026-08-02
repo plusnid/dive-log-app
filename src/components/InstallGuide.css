@@ -1,0 +1,30 @@
+.install-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 0.9rem;
+}
+
+.install-guide__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.install-guide__title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.install-guide__close {
+  flex-shrink: 0;
+  min-height: 44px;
+  min-width: 44px;
+  line-height: 1;
+  padding: 0;
+}
