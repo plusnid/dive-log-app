@@ -14,7 +14,10 @@ export function DiveLogListItem({ diveLog, onSelect }: DiveLogListItemProps) {
       <button type="button" className="dive-log-list-item__button" onClick={() => onSelect(diveLog.id!)}>
         <div className="dive-log-list-item__main">
           <span className="dive-log-list-item__date">{diveLog.date}</span>
-          <span className="dive-log-list-item__site">{diveLog.siteName}</span>
+          <span className="dive-log-list-item__site-group">
+            {diveLog.area && <span className="dive-log-list-item__area">{diveLog.area}</span>}
+            <span className="dive-log-list-item__site">{diveLog.siteName}</span>
+          </span>
         </div>
         <div className="dive-log-list-item__meta">
           {diveLog.maxDepth != null && <span>最大水深 {diveLog.maxDepth}m</span>}

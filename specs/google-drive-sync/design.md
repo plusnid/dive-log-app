@@ -128,16 +128,20 @@ this.version(2)
   "deletedAt": null,
   "deviceId": "書き込んだ端末のID",
   "log": {
-    "date": "2026-07-20", "startTime": "09:30", "siteName": "石垣島 マンタスクランブル",
+    "date": "2026-07-20", "startTime": "09:30", "area": "石垣島", "siteName": "マンタスクランブル",
     "maxDepth": 18.5, "duration": 42, "waterTemp": 28, "visibility": 20,
     "weather": "sunny", "current": "moderate",
+    // 未入力（undefined）の項目は JSON.stringify により省略される（例では wetSuit / steelTank が未選択）
+    "drySuit": "inner_medium", "hood": true, "hoodVest": false, "aluminumTank": "al_11l",
     "tankStartPressure": 200, "tankEndPressure": 60, "weight": 4,
-    "gear": "...", "buddyName": "...", "notes": "...", "guideName": "..."
+    "buddyName": "...", "notes": "...", "guideName": "..."
   },
   "photoUuids": ["...", "..."],
   "signatureUuid": "..." // なければ null
 }
 ```
+
+`log` の中身は `DiveLogDraft`（= `DiveLog` から `id` / `uuid` / 添付ID / 日時メタを除いたもの）をそのまま書き出したものなので、[dive-log-crud](../dive-log-crud/design.md) 側で項目が追加・廃止されても同期エンジンの変更は不要（`schemaVersion` も上げない）。廃止済みの旧項目 `gear` は型定義上 `DiveLogDraft` から外れているが、rest スプレッドにより実行時には引き続き読み書きされ、端末間で値が保持される（詳細は [dive-log-crud/design.md](../dive-log-crud/design.md) の「Google Drive 同期への影響」）。
 
 削除されたログは、ファイルを消さずに**墓標ファイル**へ置き換える（REQ-5.2）。
 

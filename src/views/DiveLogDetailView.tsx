@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { deleteDiveLog, getDiveLogDetail, type DiveLogDetail } from '../db/diveLogRepository'
+import { aluminumTankOptions, drySuitOptions, gearLabel, steelTankOptions, wetSuitOptions } from '../types/gearOptions'
 
 interface DiveLogDetailViewProps {
   id: number
@@ -74,6 +75,8 @@ export function DiveLogDetailView({ id, onBack, onEdit, onDeleted }: DiveLogDeta
       <section>
         <h2>基本情報</h2>
         <dl>
+          <dt>エリア</dt>
+          <dd>{diveLog.area || '-'}</dd>
           <dt>最大水深</dt>
           <dd>{diveLog.maxDepth ?? '-'} m</dd>
           <dt>潜水時間</dt>
@@ -98,14 +101,30 @@ export function DiveLogDetailView({ id, onBack, onEdit, onDeleted }: DiveLogDeta
       <section>
         <h2>器材・エア管理</h2>
         <dl>
+          <dt>ドライスーツ</dt>
+          <dd>{gearLabel(drySuitOptions, diveLog.drySuit)}</dd>
+          <dt>ウェットスーツ</dt>
+          <dd>{gearLabel(wetSuitOptions, diveLog.wetSuit)}</dd>
+          <dt>フード</dt>
+          <dd>{diveLog.hood ? '着用' : '-'}</dd>
+          <dt>フードベスト</dt>
+          <dd>{diveLog.hoodVest ? '着用' : '-'}</dd>
+          <dt>アルミタンク</dt>
+          <dd>{gearLabel(aluminumTankOptions, diveLog.aluminumTank)}</dd>
+          <dt>スチールタンク</dt>
+          <dd>{gearLabel(steelTankOptions, diveLog.steelTank)}</dd>
           <dt>タンク圧力（開始/終了）</dt>
           <dd>
             {diveLog.tankStartPressure ?? '-'} / {diveLog.tankEndPressure ?? '-'} bar
           </dd>
           <dt>ウェイト</dt>
           <dd>{diveLog.weight ?? '-'} kg</dd>
-          <dt>使用器材</dt>
-          <dd>{diveLog.gear || '-'}</dd>
+          {diveLog.gear && (
+            <>
+              <dt>使用器材（旧項目）</dt>
+              <dd>{diveLog.gear}</dd>
+            </>
+          )}
         </dl>
       </section>
 

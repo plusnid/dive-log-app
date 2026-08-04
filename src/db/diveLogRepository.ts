@@ -121,6 +121,26 @@ export async function deleteDiveLog(id: number): Promise<void> {
   notifyLocalChange()
 }
 
+/** 指定日付のログのうち、引き継ぎ元となる1件を返す（REQ-7.2, REQ-7.3）。 */
+export async function findCarryOverSource(date: string): Promise<DiveLog | undefined> {
+  const candidates = await db.diveLogs.where('date').equals(date).toArray()
+  candidates.sort((a, b) => {
+    if (a.updatedAt !== b.updatedAt) return a.updatedAt > b.updatedAt ? -1 : 1
+    return (b.id ?? 0) - (a.id ?? 0)
+  })
+  return candidates[0]
+}
+
+/** 参照入力の元データ（エリア名・ダイビングポイント名の組）を「最近使った順」で返す（REQ-8.3〜REQ-8.5, REQ-8.10, REQ-8.12）。 */
+export async function listPastPlaceValues(): Promise<{ area: string; siteName: string }[]> {
+  const diveLogs = await db.diveLogs.toArray()
+  diveLogs.sort((a, b) => {
+    if (a.date !== b.date) return a.date > b.date ? -1 : 1
+    return a.updatedAt > b.updatedAt ? -1 : 1
+  })
+  return diveLogs.map((diveLog) => ({ area: diveLog.area ?? '', siteName: diveLog.siteName }))
+}
+
 export interface DiveLogDetail {
   diveLog: DiveLog
   photos: Attachment[]

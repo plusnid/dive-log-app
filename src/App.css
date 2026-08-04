@@ -42,9 +42,31 @@
   font-size: 0.9rem;
 }
 
+.dive-log-form label:has(input[type='checkbox']) {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
 .dive-log-form textarea {
   min-height: 4rem;
   resize: vertical;
+}
+
+.dive-log-form__input-with-picker {
+  display: flex;
+  align-items: center;
+}
+
+.dive-log-form__input-with-picker input {
+  flex: 1;
+}
+
+.dive-log-form__carry-over-notice {
+  font-size: 0.85rem;
+  color: var(--accent);
+  margin: 0;
 }
 
 .form-error {

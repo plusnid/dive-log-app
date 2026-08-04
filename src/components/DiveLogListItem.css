@@ -21,6 +21,15 @@
   font-weight: 600;
 }
 
+.dive-log-list-item__area {
+  color: #777;
+  font-weight: 400;
+}
+
+.dive-log-list-item__area::after {
+  content: '・';
+}
+
 .dive-log-list-item__meta {
   display: flex;
   flex-wrap: wrap;

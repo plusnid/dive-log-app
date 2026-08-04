@@ -1,8 +1,25 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { SignaturePad, type SignaturePadHandle } from '../components/SignaturePad'
 import { PhotoPicker } from '../components/PhotoPicker'
-import { createDiveLog, updateDiveLog, getDiveLogDetail } from '../db/diveLogRepository'
-import type { Attachment, Current, DiveLogDraft, Weather } from '../types/diveLog'
+import { PastValuePicker, derivePlaceCandidates } from '../components/PastValuePicker'
+import {
+  createDiveLog,
+  updateDiveLog,
+  getDiveLogDetail,
+  findCarryOverSource,
+  listPastPlaceValues,
+} from '../db/diveLogRepository'
+import type { Attachment, Current, DiveLog, DiveLogDraft, Weather } from '../types/diveLog'
+import {
+  aluminumTankOptions,
+  drySuitOptions,
+  steelTankOptions,
+  wetSuitOptions,
+  type AluminumTank,
+  type DrySuit,
+  type SteelTank,
+  type WetSuit,
+} from '../types/gearOptions'
 
 interface DiveLogFormViewProps {
   id?: number
@@ -13,6 +30,7 @@ interface DiveLogFormViewProps {
 const emptyDraft: DiveLogDraft = {
   date: new Date().toISOString().slice(0, 10),
   startTime: '',
+  area: '',
   siteName: '',
   maxDepth: undefined,
   duration: undefined,
@@ -20,10 +38,15 @@ const emptyDraft: DiveLogDraft = {
   visibility: undefined,
   weather: undefined,
   current: undefined,
+  drySuit: undefined,
+  wetSuit: undefined,
+  hood: false,
+  hoodVest: false,
+  aluminumTank: undefined,
+  steelTank: undefined,
   tankStartPressure: undefined,
   tankEndPressure: undefined,
   weight: undefined,
-  gear: '',
   buddyName: '',
   notes: '',
   guideName: '',
@@ -35,10 +58,29 @@ function numberOrUndefined(value: string): number | undefined {
   return Number.isNaN(n) ? undefined : n
 }
 
+/**
+ * 引き継ぎ対象項目（REQ-7.4）を DiveLog から抽出する。
+ * 文字列項目は `?? ''`、真偽値は `?? false`、数値・選択リストはそのまま（`undefined` 可）に正規化する（REQ-7.6）。
+ */
+function pickCarryOverFields(source: DiveLog): Partial<DiveLogDraft> {
+  return {
+    area: source.area ?? '',
+    drySuit: source.drySuit,
+    wetSuit: source.wetSuit,
+    hood: source.hood ?? false,
+    hoodVest: source.hoodVest ?? false,
+    aluminumTank: source.aluminumTank,
+    steelTank: source.steelTank,
+    weight: source.weight,
+    guideName: source.guideName ?? '',
+    buddyName: source.buddyName ?? '',
+  }
+}
+
 export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps) {
   const isEditing = id != null
   const [draft, setDraft] = useState<DiveLogDraft>(emptyDraft)
-  const [loading, setLoading] = useState(isEditing)
+  const [loading, setLoading] = useState(true)
   const [existingPhotos, setExistingPhotos] = useState<Attachment[]>([])
   const [removedPhotoIds, setRemovedPhotoIds] = useState<number[]>([])
   const [newFiles, setNewFiles] = useState<File[]>([])
@@ -46,6 +88,13 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const signaturePadRef = useRef<SignaturePadHandle>(null)
+
+  // 過去ログからの参照入力（REQ-8）用の元データ。新規作成・編集のどちらでも使う。
+  const [placeRecords, setPlaceRecords] = useState<{ area: string; siteName: string }[]>([])
+  // 同日の直前ログからの引き継ぎ（REQ-7）用の状態。編集時は使わない。
+  const [carryOverSource, setCarryOverSource] = useState<DiveLog | undefined>(undefined)
+  const [carriedOverFrom, setCarriedOverFrom] = useState<string | null>(null)
+  const isFirstDateEffect = useRef(true)
 
   useEffect(() => {
     if (!isEditing) return
@@ -56,6 +105,7 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
       setDraft({
         date: diveLog.date,
         startTime: diveLog.startTime ?? '',
+        area: diveLog.area ?? '',
         siteName: diveLog.siteName,
         maxDepth: diveLog.maxDepth,
         duration: diveLog.duration,
@@ -63,10 +113,15 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
         visibility: diveLog.visibility,
         weather: diveLog.weather,
         current: diveLog.current,
+        drySuit: diveLog.drySuit,
+        wetSuit: diveLog.wetSuit,
+        hood: diveLog.hood ?? false,
+        hoodVest: diveLog.hoodVest ?? false,
+        aluminumTank: diveLog.aluminumTank,
+        steelTank: diveLog.steelTank,
         tankStartPressure: diveLog.tankStartPressure,
         tankEndPressure: diveLog.tankEndPressure,
         weight: diveLog.weight,
-        gear: diveLog.gear ?? '',
         buddyName: diveLog.buddyName ?? '',
         notes: diveLog.notes ?? '',
         guideName: diveLog.guideName ?? '',
@@ -80,14 +135,73 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
     }
   }, [id, isEditing])
 
+  // 参照入力の候補の初期ロード（REQ-8）。新規作成・編集のどちらでも取得する。
+  useEffect(() => {
+    let cancelled = false
+    listPastPlaceValues().then((places) => {
+      if (!cancelled) setPlaceRecords(places)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // 新規作成時のマウント時引き継ぎ（REQ-7.1）。
+  useEffect(() => {
+    if (isEditing) return
+    let cancelled = false
+    findCarryOverSource(emptyDraft.date).then((source) => {
+      if (cancelled) return
+      setCarryOverSource(source)
+      if (source) {
+        setDraft((prev) => ({ ...prev, ...pickCarryOverFields(source) }))
+        setCarriedOverFrom(source.date)
+      }
+      setLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isEditing])
+
+  // 日付変更時は引き継ぎ元の有無だけを再取得する（自動コピーはしない、REQ-7.10）。
+  // 変更前の日付についての引き継ぎ通知は、現在の日付と食い違うため取り下げる（REQ-7.7）。
+  useEffect(() => {
+    if (isEditing) return
+    if (isFirstDateEffect.current) {
+      // 初回（マウント時）は上の effect が同じ日付で既に処理済み。
+      isFirstDateEffect.current = false
+      return
+    }
+    setCarriedOverFrom(null)
+    let cancelled = false
+    findCarryOverSource(draft.date).then((source) => {
+      if (!cancelled) setCarryOverSource(source)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [draft.date, isEditing])
+
   useEffect(() => {
     return () => {
       if (existingSignatureUrl) URL.revokeObjectURL(existingSignatureUrl)
     }
   }, [existingSignatureUrl])
 
+  const placeCandidates = useMemo(
+    () => derivePlaceCandidates(placeRecords, draft.area ?? ''),
+    [placeRecords, draft.area],
+  )
+
   function updateField<K extends keyof DiveLogDraft>(key: K, value: DiveLogDraft[K]) {
     setDraft((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function handleCarryOver() {
+    if (!carryOverSource) return
+    setDraft((prev) => ({ ...prev, ...pickCarryOverFields(carryOverSource) }))
+    setCarriedOverFrom(carryOverSource.date)
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -134,6 +248,12 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
       </button>
       <h1>{isEditing ? 'ダイビングログを編集' : '新規ダイビングログ'}</h1>
 
+      {!isEditing && carriedOverFrom && (
+        <p className="dive-log-form__carry-over-notice">
+          同じ日付（{carriedOverFrom}）の直前の記録から、エリア・器材・ガイド名などを引き継ぎました。
+        </p>
+      )}
+
       <fieldset>
         <legend>基本情報</legend>
         <label>
@@ -145,13 +265,31 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
           <input type="time" value={draft.startTime ?? ''} onChange={(e) => updateField('startTime', e.target.value)} />
         </label>
         <label>
+          エリア
+          <span className="dive-log-form__input-with-picker">
+            <input type="text" value={draft.area ?? ''} onChange={(e) => updateField('area', e.target.value)} />
+            <PastValuePicker
+              title="過去のエリア"
+              values={placeCandidates.areas}
+              onSelect={(value) => updateField('area', value)}
+            />
+          </span>
+        </label>
+        <label>
           ダイビングポイント
-          <input
-            type="text"
-            required
-            value={draft.siteName}
-            onChange={(e) => updateField('siteName', e.target.value)}
-          />
+          <span className="dive-log-form__input-with-picker">
+            <input
+              type="text"
+              required
+              value={draft.siteName}
+              onChange={(e) => updateField('siteName', e.target.value)}
+            />
+            <PastValuePicker
+              title="過去のダイビングポイント"
+              values={placeCandidates.siteNames}
+              onSelect={(value) => updateField('siteName', value)}
+            />
+          </span>
         </label>
         <label>
           最大水深 (m)
@@ -227,6 +365,74 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
       <fieldset>
         <legend>器材・エア管理</legend>
         <label>
+          ドライスーツ
+          <select
+            value={draft.drySuit ?? ''}
+            onChange={(e) => updateField('drySuit', (e.target.value || undefined) as DrySuit | undefined)}
+          >
+            <option value="">選択なし</option>
+            {drySuitOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          ウェットスーツ
+          <select
+            value={draft.wetSuit ?? ''}
+            onChange={(e) => updateField('wetSuit', (e.target.value || undefined) as WetSuit | undefined)}
+          >
+            <option value="">選択なし</option>
+            {wetSuitOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <input type="checkbox" checked={draft.hood ?? false} onChange={(e) => updateField('hood', e.target.checked)} />
+          フード
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={draft.hoodVest ?? false}
+            onChange={(e) => updateField('hoodVest', e.target.checked)}
+          />
+          フードベスト
+        </label>
+        <label>
+          アルミタンク
+          <select
+            value={draft.aluminumTank ?? ''}
+            onChange={(e) => updateField('aluminumTank', (e.target.value || undefined) as AluminumTank | undefined)}
+          >
+            <option value="">選択なし</option>
+            {aluminumTankOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          スチールタンク
+          <select
+            value={draft.steelTank ?? ''}
+            onChange={(e) => updateField('steelTank', (e.target.value || undefined) as SteelTank | undefined)}
+          >
+            <option value="">選択なし</option>
+            {steelTankOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
           タンク開始圧力 (bar)
           <input
             type="number"
@@ -254,10 +460,11 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
             onChange={(e) => updateField('weight', numberOrUndefined(e.target.value))}
           />
         </label>
-        <label>
-          使用器材
-          <input type="text" value={draft.gear ?? ''} onChange={(e) => updateField('gear', e.target.value)} />
-        </label>
+        {!isEditing && (
+          <button type="button" disabled={!carryOverSource} onClick={handleCarryOver}>
+            同じ日付の直前のログから引き継ぐ
+          </button>
+        )}
       </fieldset>
 
       <fieldset>
