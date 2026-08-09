@@ -134,9 +134,10 @@ this.version(2)
     // 未入力（undefined）の項目は JSON.stringify により省略される（例では wetSuit / steelTank が未選択）
     "drySuit": "inner_medium", "hood": true, "hoodVest": false, "aluminumTank": "al_11l",
     "tankStartPressure": 200, "tankEndPressure": 60, "weight": 4,
-    "buddyName": "...", "notes": "...", "guideName": "..."
+    "buddyName": "...", "notes": "...", "guideName": "...",
+    "planImageUuids": ["...", "..."] // ダイビングプラン画像。各要素は photoUuids にも含まれる（dive-plan-image/design.md 7節）
   },
-  "photoUuids": ["...", "..."],
+  "photoUuids": ["...", "...", "...", "..."], // プラン画像の実体も含む（末尾規約はローカルの表示用で、Drive上の順序には依存しない）
   "signatureUuid": "..." // なければ null
 }
 ```

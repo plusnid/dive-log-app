@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { SignaturePad, type SignaturePadHandle } from '../components/SignaturePad'
 import { PhotoPicker } from '../components/PhotoPicker'
+import { PlanImagePicker } from '../components/PlanImagePicker'
 import { PastValuePicker, derivePlaceCandidates } from '../components/PastValuePicker'
 import { WeatherSelect } from '../components/WeatherSelect'
 import { ObservationEditor, type AvailablePhoto } from '../components/ObservationEditor'
@@ -88,6 +89,10 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
   const [existingPhotos, setExistingPhotos] = useState<Attachment[]>([])
   const [removedPhotoIds, setRemovedPhotoIds] = useState<number[]>([])
   const [newFiles, setNewFiles] = useState<File[]>([])
+  // ダイビングプラン画像（写真とは独立した3状態。dive-plan-image/design.md 6-4）
+  const [existingPlanImages, setExistingPlanImages] = useState<Attachment[]>([])
+  const [removedPlanImageIds, setRemovedPlanImageIds] = useState<number[]>([])
+  const [newPlanImageFiles, setNewPlanImageFiles] = useState<File[]>([])
   const [existingSignatureUrl, setExistingSignatureUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -110,7 +115,7 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
     let cancelled = false
     getDiveLogDetail(id).then((detail) => {
       if (cancelled || !detail) return
-      const { diveLog, photos, signature } = detail
+      const { diveLog, photos, planImages, signature } = detail
       setDraft({
         date: diveLog.date,
         startTime: diveLog.startTime ?? '',
@@ -136,6 +141,7 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
         guideName: diveLog.guideName ?? '',
       })
       setExistingPhotos(photos)
+      setExistingPlanImages(planImages) // REQ-2.4: 保存済みのプラン画像をすべてプレビューとして表示
       setExistingSignatureUrl(signature ? URL.createObjectURL(signature.blob) : null)
 
       // 保存済みの観察記録をフォームの初期値として読み込む（REQ-2.12）。
@@ -270,6 +276,10 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
     )
   }
 
+  function handleRemoveExistingPlanImage(pid: number) {
+    setRemovedPlanImageIds((prev) => [...prev, pid])
+  }
+
   function handleNewFilesChange(next: File[]) {
     setNewFiles(next)
     setObservations((prev) =>
@@ -289,10 +299,12 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
           removedPhotoIds,
           newSignatureBlob: signatureBlob,
           observations,
+          newPlanImageFiles,
+          removedPlanImageIds,
         })
         onSaved(id)
       } else {
-        const newId = await createDiveLog(draft, newFiles, signatureBlob ?? null, observations)
+        const newId = await createDiveLog(draft, newFiles, signatureBlob ?? null, observations, newPlanImageFiles)
         onSaved(newId)
       }
     } catch (error) {
@@ -382,6 +394,16 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
             inputMode="numeric"
             value={draft.duration ?? ''}
             onChange={(e) => updateField('duration', numberOrUndefined(e.target.value))}
+          />
+        </label>
+        <label>
+          ダイビングプラン画像
+          <PlanImagePicker
+            existingImages={existingPlanImages.map((p) => ({ id: p.id as number, blob: p.blob }))}
+            removedExistingIds={removedPlanImageIds}
+            onRemoveExisting={handleRemoveExistingPlanImage}
+            newFiles={newPlanImageFiles}
+            onNewFilesChange={setNewPlanImageFiles}
           />
         </label>
       </fieldset>

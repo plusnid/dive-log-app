@@ -172,6 +172,47 @@
   border: 1px solid var(--border);
 }
 
+.detail-plan-images {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-plan-images__label {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.detail-plan-images__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detail-plan-images img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.detail-plan-images__button {
+  padding: 0;
+  border: 0;
+  background: none;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  display: block;
+  line-height: 0;
+  border-radius: 8px;
+  cursor: zoom-in;
+}
+
 .observation-list {
   list-style: none;
   margin: 0;
@@ -249,6 +290,8 @@
 
 .detail-signature {
   max-width: 300px;
+  max-height: 40svh; /* 保存画像の縦横比が可変になったため（signature-fullscreen REQ-6.7） */
+  object-fit: contain;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #fff;

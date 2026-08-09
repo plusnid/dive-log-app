@@ -53,6 +53,14 @@ export interface DiveLog {
   // 観察した生物
   /** 観察した生物。未設定（undefined）は0件と同義（REQ-7.1） */
   observations?: Observation[]
+  /**
+   * ダイビングプラン画像。値は `Attachment.uuid` の配列（端末非依存。REQ-8.1, REQ-8.4）。
+   * 配列の順序が表示順（REQ-1.4）。上限なし（REQ-1.3）。
+   * 実体は同じ `attachments` に `type: 'photo'` として保存され、`photoIds` にも含まれる
+   * （同期エンジンが添付を `photoIds` から列挙するため。dive-plan-image/design.md 0-3）。
+   * 未設定（undefined）と空配列はいずれも「プラン画像なし」（REQ-1.2, REQ-7.1）。
+   */
+  planImageUuids?: string[]
   // メタデータ
   createdAt: string
   updatedAt: string
@@ -69,7 +77,15 @@ export interface Attachment {
 
 export type DiveLogDraft = Omit<
   DiveLog,
-  'id' | 'uuid' | 'photoIds' | 'signatureId' | 'createdAt' | 'updatedAt' | 'gear' | 'observations'
+  | 'id'
+  | 'uuid'
+  | 'photoIds'
+  | 'signatureId'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'gear'
+  | 'observations'
+  | 'planImageUuids'
 >
 
 /**

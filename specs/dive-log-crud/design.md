@@ -39,17 +39,23 @@ interface DiveLog {
   photoIds: number[]
   signatureId?: number
   guideName?: string
+  /**
+   * ダイビングプラン画像。値は `Attachment.uuid` の配列（[dive-plan-image](../dive-plan-image/design.md)）。
+   * 実体は写真と同じ `attachments` に `type: 'photo'` として保存され、`photoIds` にも含まれる。
+   * 未設定（undefined）と空配列はいずれも「プラン画像なし」。
+   */
+  planImageUuids?: string[]
   createdAt: string   // ISO日時
   updatedAt: string   // ISO日時
 }
 
 type DiveLogDraft = Omit<
   DiveLog,
-  'id' | 'photoIds' | 'signatureId' | 'createdAt' | 'updatedAt' | 'gear' | 'observations'
+  'id' | 'photoIds' | 'signatureId' | 'createdAt' | 'updatedAt' | 'gear' | 'observations' | 'planImageUuids'
 >
 ```
 
-`DiveLogDraft` はフォームが扱う「保存前の入力値」。写真・サインID・メタデータはリポジトリ層が計算して付与する。`gear` を `Omit` に加えることで、フォームからは旧項目を書き込めなくする（実装上の `uuid` も現状どおり `Omit` 対象）。`observations`（[marine-life-observation](../marine-life-observation/requirements.md)）も同じ理由で `Omit` に含まれる: 写真参照の解決（`Attachment.uuid` の確定）がリポジトリ層でのみ可能なため、フォームは `ObservationDraft[]` を独立した引数として渡す。
+`DiveLogDraft` はフォームが扱う「保存前の入力値」。写真・サインID・メタデータはリポジトリ層が計算して付与する。`gear` を `Omit` に加えることで、フォームからは旧項目を書き込めなくする（実装上の `uuid` も現状どおり `Omit` 対象）。`observations`（[marine-life-observation](../marine-life-observation/requirements.md)）も同じ理由で `Omit` に含まれる: 写真参照の解決（`Attachment.uuid` の確定）がリポジトリ層でのみ可能なため、フォームは `ObservationDraft[]` を独立した引数として渡す。`planImageUuids`（[dive-plan-image](../dive-plan-image/requirements.md)）も同じ理由で `Omit` に含まれる: フォームは未保存のプラン画像（`File`）と保存済みの添付ID（`number`）しか持てず、`Attachment.uuid` へ解決できるのはリポジトリ層だけであるため、フォームは `newPlanImageFiles: File[]` / `removedPlanImageIds: number[]` を独立した引数として渡す。
 
 `area` は `siteName` と同じ基本情報カテゴリに属する独立した任意項目（REQ-2.6）。エリアを表す別テーブルや参照ID（外部キー）は作らず、ログ1件ごとの文字列として持つ。フォーム上は他の任意テキスト項目（`buddyName` / `guideName`）と同様に空文字 `''` を初期値とし、リポジトリ層に渡る値も含めて空文字は「未入力」として扱う（表示側は `diveLog.area || '-'` のように falsy 判定する）。過去ログからの参照入力（REQ-8）も最終的にこの文字列へ値を書き込むだけで、参照元ログのIDは保持しない（REQ-8.11）。
 
@@ -130,10 +136,10 @@ class DiveLogDatabase extends Dexie {
 
 UIコンポーネントは Dexie を直接呼ばず、以下の関数のみを使う。
 
-- `createDiveLog(draft, photoFiles, signatureBlob, observations)`: `db.transaction('rw', diveLogs, attachments)` 内で添付を先に保存してIDを確定させ、`DiveLog` を1件 `add`。`observations`（[marine-life-observation](../marine-life-observation/design.md)、既定値 `[]`）は保存した写真の `Attachment.uuid` へ解決したうえで書き込む。
-- `updateDiveLog(id, draft, { newPhotoFiles, removedPhotoIds, newSignatureBlob, observations })`: 既存レコードを取得し、削除対象添付の `bulkDelete`、新規写真の追加、`photoIds` の再計算、サインの差し替えロジック（[guide-signature/design.md](../guide-signature/design.md) 参照）を行った上で `update`。`observations` が `undefined` のときは既存の観察記録を変更しない（[marine-life-observation](../marine-life-observation/design.md) の「リポジトリ層」参照）。
-- `deleteDiveLog(id)`: ログに紐づく `photoIds` + `signatureId` をまとめて `bulkDelete` してからログ本体を `delete`（カスケード削除）。
-- `getDiveLogDetail(id)`: ログ本体と、紐づく写真配列・サイン（あれば）をまとめて返す `DiveLogDetail` を組み立てる（`attachments.bulkGet` / `attachments.get`）。
+- `createDiveLog(draft, photoFiles, signatureBlob, observations, planImageFiles)`: `db.transaction('rw', diveLogs, attachments)` 内で添付を先に保存してIDを確定させ、`DiveLog` を1件 `add`。`observations`（[marine-life-observation](../marine-life-observation/design.md)、既定値 `[]`）は保存した写真の `Attachment.uuid` へ解決したうえで書き込む。`planImageFiles`（[dive-plan-image](../dive-plan-image/design.md)、既定値 `[]`）も同じトランザクションで `type: 'photo'` として保存し、その添付IDを `photoIds` の末尾に、`uuid` を `planImageUuids` に書き込む。
+- `updateDiveLog(id, draft, { newPhotoFiles, removedPhotoIds, newSignatureBlob, observations, newPlanImageFiles, removedPlanImageIds })`: 既存レコードを取得し、削除対象添付（写真・プラン画像を合わせた集合）の `bulkDelete`、新規写真・新規プラン画像の追加、`photoIds` / `planImageUuids` の再計算（プラン画像の添付IDは常に `photoIds` の末尾に置く規約を維持する）、サインの差し替えロジック（[guide-signature/design.md](../guide-signature/design.md) 参照）を行った上で `update`。`observations` が `undefined` のときは既存の観察記録を変更しない（[marine-life-observation](../marine-life-observation/design.md) の「リポジトリ層」参照）。観察記録の写真候補（`allowedUuids`）からはプラン画像の `uuid` を除外する。
+- `deleteDiveLog(id)`: ログに紐づく `photoIds`（プラン画像の添付を含む）+ `signatureId` をまとめて `bulkDelete` してからログ本体を `delete`（カスケード削除）。
+- `getDiveLogDetail(id)`: ログ本体と、紐づく写真配列（プラン画像を除く）・プラン画像配列・サイン（あれば）をまとめて返す `DiveLogDetail`（`{ diveLog, photos, planImages, signature }`）を組み立てる（`attachments.bulkGet` / `attachments.get`）。`planImageUuids` の順序で解決し、解決できない参照は落とす（[dive-plan-image/design.md](../dive-plan-image/design.md) 6-3節）。
 
 本機能追加で以下の2つの読み取り関数を追加する（いずれも書き込みを伴わないため `transaction` は不要）。
 

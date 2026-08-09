@@ -25,10 +25,12 @@ const currentLabel: Record<string, string> = {
 type LightboxTarget =
   | { kind: 'log'; index: number } // 写真・メモから（REQ-4.1）
   | { kind: 'observation'; uuid: string; index: number } // 観察記録の行から（REQ-4.2）
+  | { kind: 'plan'; index: number } // ダイビングプラン画像から（dive-plan-image REQ-4.2）
 
 export function DiveLogDetailView({ id, onBack, onEdit, onDeleted, onSelectCreature }: DiveLogDetailViewProps) {
   const [detail, setDetail] = useState<DiveLogDetail | null | undefined>(undefined)
   const [photoUrls, setPhotoUrls] = useState<string[]>([])
+  const [planImageUrls, setPlanImageUrls] = useState<string[]>([])
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
   const [lightbox, setLightbox] = useState<LightboxTarget | null>(null)
 
@@ -46,11 +48,14 @@ export function DiveLogDetailView({ id, onBack, onEdit, onDeleted, onSelectCreat
   useEffect(() => {
     if (!detail) return
     const urls = detail.photos.map((p) => URL.createObjectURL(p.blob))
+    const planUrls = detail.planImages.map((p) => URL.createObjectURL(p.blob))
     const sigUrl = detail.signature ? URL.createObjectURL(detail.signature.blob) : null
     setPhotoUrls(urls)
+    setPlanImageUrls(planUrls)
     setSignatureUrl(sigUrl)
     return () => {
       urls.forEach((u) => URL.revokeObjectURL(u))
+      planUrls.forEach((u) => URL.revokeObjectURL(u))
       if (sigUrl) URL.revokeObjectURL(sigUrl)
     }
   }, [detail])
@@ -88,6 +93,9 @@ export function DiveLogDetailView({ id, onBack, onEdit, onDeleted, onSelectCreat
     if (target.kind === 'log') {
       return photoUrls.map((url) => ({ url, label: 'ダイビング写真' }))
     }
+    if (target.kind === 'plan') {
+      return planImageUrls.map((url) => ({ url, label: 'ダイビングプランの画像' })) // REQ-4.2, REQ-4.3
+    }
     const observation = observations.find((o) => o.uuid === target.uuid)
     if (!observation) return []
     return observation.photoUuids
@@ -118,6 +126,29 @@ export function DiveLogDetailView({ id, onBack, onEdit, onDeleted, onSelectCreat
           <dt>潜水時間</dt>
           <dd>{diveLog.duration ?? '-'} 分</dd>
         </dl>
+        {planImageUrls.length > 0 && (
+          <div className="detail-plan-images">
+            <p className="detail-plan-images__label">ダイビングプラン</p>
+            <div className="detail-plan-images__list">
+              {planImageUrls.map((url, i) => {
+                const name = planImageUrls.length > 1 ? `ダイビングプランの画像${i + 1}` : 'ダイビングプランの画像'
+                return canShowLightbox ? (
+                  <button
+                    key={url}
+                    type="button"
+                    className="detail-plan-images__button"
+                    aria-label={`${name}を拡大表示`}
+                    onClick={() => setLightbox({ kind: 'plan', index: i })}
+                  >
+                    <img src={url} alt="" />
+                  </button>
+                ) : (
+                  <img key={url} src={url} alt={name} /> /* REQ-4.9 */
+                )
+              })}
+            </div>
+          </div>
+        )}
       </section>
 
       <section>

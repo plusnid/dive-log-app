@@ -169,9 +169,17 @@ export async function createConflictCopy(source: DiveLogSnapshot): Promise<void>
       }),
     }))
 
+    // ダイビングプラン画像の参照も、観察記録とまったく同じ flatMap の形で複製後の添付へ写像する（REQ-8.3）。
+    // 複製できなかった参照は落とし、残りの参照と順序を保つ。
+    const planImageUuids = source.log.planImageUuids?.flatMap((uuid) => {
+      const mapped = photoUuidMap.get(uuid)
+      return mapped ? [mapped] : []
+    })
+
     await db.diveLogs.add({
       ...source.log,
       observations,
+      planImageUuids,
       siteName: `${source.log.siteName}（競合コピー ${formatConflictTimestamp(now)}）`,
       uuid: newUuid(),
       photoIds,

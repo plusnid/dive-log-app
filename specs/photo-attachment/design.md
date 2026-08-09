@@ -18,6 +18,8 @@ interface Attachment {
 
 写真とガイドサインは同じ `attachments` テーブルを共有し、`type` フィールドで区別する（Dexie: `attachments: '++id, type'`）。`DiveLog.photoIds: number[]` が対象ログに属する写真の参照リスト。
 
+[dive-plan-image](../dive-plan-image/design.md) が追加する「ダイビングプラン画像」も、実体は同じ `attachments` テーブルに `type: 'photo'` として同居する（`Attachment.type` に `'plan'` 等の新しい値は追加しない）。プラン画像の添付IDは通常の写真と同様に `DiveLog.photoIds` にも含まれるため、`attachments` テーブルだけを見ても両者は区別できない。写真かプラン画像かは `DiveLog.planImageUuids?: string[]`（プラン画像として扱う `Attachment.uuid` の配列）でのみ区別され、リポジトリ層 (`getDiveLogDetail`) がこの参照をもとに `photos`（プラン画像を除く）と `planImages` を分離して返す。
+
 ## 保存フロー（`src/db/diveLogRepository.ts`）
 
 - 新規作成: `photoFiles: File[]` を受け取り、`Promise.all` で各ファイルを `addAttachment('photo', file)` として並列保存し、返ってきたIDの配列を `DiveLog.photoIds` にセット。

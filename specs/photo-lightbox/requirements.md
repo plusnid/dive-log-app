@@ -7,12 +7,13 @@
 ## 概要
 
 ダイビングログの詳細画面に表示している写真サムネイルを選択したとき、その写真を画面いっぱいに拡大して表示できるようにする。
-対象は詳細画面（`src/views/DiveLogDetailView.tsx`）の次の2箇所である。
+対象は詳細画面（`src/views/DiveLogDetailView.tsx`）の次の3箇所である（3は [dive-plan-image](../dive-plan-image/requirements.md) が追加）。
 
 | # | 箇所 | 現状の表示 | 由来 |
 | --- | --- | --- | --- |
 | 1 | 「写真・メモ」セクションの写真一覧（`.detail-photos`） | そのログに添付された全写真を120×120pxのサムネイルで並べる | [photo-attachment REQ-7](../photo-attachment/requirements.md) |
 | 2 | 「観察した生物」セクションの各行のサムネイル（`.observation-list__thumb`） | 各観察記録に紐づく先頭1枚を32×32pxで表示する | [marine-life-observation REQ-4.4](../marine-life-observation/requirements.md) |
+| 3 | 「基本情報」セクションのダイビングプラン画像一覧（`.detail-plan-images`） | そのログのダイビングプラン画像全体を横幅いっぱい・最大高さ240pxで縦積みに並べる。対象の集合は当該ログのプラン画像全体（写真・観察記録の写真は含まない） | [dive-plan-image REQ-4](../dive-plan-image/requirements.md) |
 
 本機能は**表示層だけの追加**であり、保存されるデータ・Dexieのスキーマ・[Google Drive同期](../google-drive-sync/requirements.md)の形式には一切影響しない。
 

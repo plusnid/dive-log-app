@@ -11,6 +11,11 @@ interface DiveLogListItemProps {
 export function DiveLogListItem({ diveLog, onSelect }: DiveLogListItemProps) {
   if (diveLog.id == null) return null
 
+  // 一覧カードの「写真」枚数・サムネイルからダイビングプラン画像を除外する（REQ-5.2, REQ-5.3）。
+  // 解決できない参照が残っている場合に負にならないようクランプする（旧版端末経由のバージョン混在時）。
+  const planCount = diveLog.planImageUuids?.length ?? 0
+  const photoCount = Math.max(0, diveLog.photoIds.length - planCount)
+
   return (
     <li className="dive-log-list-item">
       <button type="button" className="dive-log-list-item__button" onClick={() => onSelect(diveLog.id!)}>
@@ -35,11 +40,11 @@ export function DiveLogListItem({ diveLog, onSelect }: DiveLogListItemProps) {
                 <span className="dive-log-list-item__meta-value">{diveLog.duration}分</span>
               </span>
             )}
-            {diveLog.photoIds.length > 0 && (
+            {photoCount > 0 && (
               <span className="dive-log-list-item__meta-item">
                 <PhotoIcon className="dive-log-list-item__icon" />
                 <span className="dive-log-list-item__meta-label">写真</span>
-                <span className="dive-log-list-item__meta-value">{diveLog.photoIds.length}枚</span>
+                <span className="dive-log-list-item__meta-value">{photoCount}枚</span>
               </span>
             )}
             {diveLog.signatureId != null && (
@@ -57,7 +62,7 @@ export function DiveLogListItem({ diveLog, onSelect }: DiveLogListItemProps) {
             )}
           </div>
         </div>
-        {diveLog.photoIds.length > 0 && <CardThumbnail photoId={diveLog.photoIds[0]} />}
+        {photoCount > 0 && <CardThumbnail photoId={diveLog.photoIds[0]} />}
       </button>
     </li>
   )

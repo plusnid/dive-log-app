@@ -169,3 +169,23 @@ export function ChevronRightIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+export function ExpandIcon({ className }: IconProps) {
+  return (
+    <svg className={className} {...commonProps}>
+      <path d="M4 9V4h5" />
+      <path d="M20 15v5h-5" />
+      <path d="M4 4l6 6" />
+      <path d="M20 20l-6-6" />
+    </svg>
+  )
+}
+
+export function EraserIcon({ className }: IconProps) {
+  return (
+    <svg className={className} {...commonProps}>
+      <path d="M7 21h10" />
+      <path d="M4 16l6-6 6 6-3 3H7z" />
+    </svg>
+  )
+}
