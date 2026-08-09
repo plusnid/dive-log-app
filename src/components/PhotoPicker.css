@@ -16,7 +16,7 @@
   height: 100%;
   object-fit: cover;
   border-radius: 6px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border);
 }
 
 .photo-picker__placeholder {
@@ -29,9 +29,9 @@
   font-size: 0.7rem;
   padding: 0.25rem;
   border-radius: 6px;
-  border: 1px dashed #ccc;
-  background: #f0f0f0;
-  color: #666;
+  border: 1px dashed var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
 }
 
 .photo-picker__thumb button {

@@ -1,0 +1,37 @@
+.app-menu {
+  position: relative;
+}
+
+.app-menu__trigger {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.5rem;
+  font-size: 1.25rem;
+}
+
+.app-menu__panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 30;
+  margin-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 12rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.2);
+  overflow: hidden;
+}
+
+.app-menu__item {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.9rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}

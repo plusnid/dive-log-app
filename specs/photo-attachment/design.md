@@ -39,7 +39,9 @@ interface Attachment {
 
 `views/DiveLogDetailView.tsx` が `getDiveLogDetail` から返る `photos: Attachment[]` を `URL.createObjectURL` で画像URL化し、アンマウント時に `revokeObjectURL` する。
 
+サムネイルをタップして拡大表示する機能は [photo-lightbox](../photo-lightbox/design.md) で追加する。同仕様はここで生成済みの画像URLをそのまま再利用し、写真の再読み込みや追加のオブジェクトURL生成を行わない（[photo-lightbox REQ-9.5](../photo-lightbox/requirements.md)）。
+
 ## 既知の制約
 
 - 画像の圧縮・リサイズは行わない（選択したファイルをそのまま `Blob` として保存）。大きな画像を多数添付するとIndexedDBの容量を圧迫する可能性がある。
-- 並び替え（表示順の変更）や1枚ずつのキャプション付与はできない。
+- 並び替え（表示順の変更）や1枚ずつのキャプション付与はできない。キャプションがないことは、拡大表示の代替テキストで写真の内容を説明できない制約にもつながる（[photo-lightbox/design.md 7](../photo-lightbox/design.md)）。

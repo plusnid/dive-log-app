@@ -1,6 +1,6 @@
 # 設計: iOS / Android での動作保証（モバイル対応）
 
-関連: [要件](./requirements.md) / [概要](../00-overview.md) / [オフライン・PWA設計](../offline-pwa/design.md)
+関連: [要件](./requirements.md) / [概要](../00-overview.md) / [オフライン・PWA設計](../offline-pwa/design.md) / [UI仕上げ レベル3設計](../ui-polish-level3/design.md)
 
 ## 方針
 
@@ -120,6 +120,7 @@ export async function getStorageEstimate(): Promise<{ usage?: number; quota?: nu
 - Android で `beforeinstallprompt` を捕捉できている場合は「インストール」ボタンを表示し、`prompt()` を呼ぶ（REQ-2.1）。
 - iOS では手順テキスト（共有ボタン →「ホーム画面に追加」）と、REQ-3.5 / REQ-3.6 の注意文を表示する。
 - 一覧画面（`DiveLogListView`）の先頭に配置する想定。
+- **明示的な再表示（REQ-2.3 の例外）**: [ui-polish-level3](../ui-polish-level3/requirements.md) で一覧画面のメニューに「ホーム画面に追加の案内」項目を追加し、そこから閉じるフラグを取り消して案内を再表示できるようにする。実装は任意prop `reopenSignal`（値が変化したら `localStorage` の閉じるフラグを `removeItem` して表示状態に戻す）で行い、**コンポーネントを再マウントしない**。再マウントすると `useInstallPrompt` が捕捉済みの `beforeinstallprompt` を失い、Android の「インストール」ボタン（REQ-2.1）が出せなくなるため。表示条件・文言・キー名（`dive-log-app:install-guide-dismissed`）は変更しない。詳細は [ui-polish-level3 設計 2-5](../ui-polish-level3/design.md#2-5-インストール案内の再表示)。
 
 ### ストレージ状態の表示先（REQ-3.4）
 
@@ -133,7 +134,7 @@ export async function getStorageEstimate(): Promise<{ usage?: number; quota?: nu
 | --- | --- | --- | --- |
 | M-1 | ホーム画面に追加でき、アイコンとアプリ名が正しく表示される | ブラウザタブ | REQ-2.2 / 2.5 |
 | M-2 | ホーム画面アイコンから起動するとブラウザUIが表示されない | スタンドアロン | REQ-2.6 |
-| M-3 | 未インストール時にインストール案内が表示され、閉じると再表示されない | ブラウザタブ | REQ-2.2 / 2.3 |
+| M-3 | 未インストール時にインストール案内が表示され、閉じると再表示されない（メニューから明示的に再表示を求めた場合のみ例外。[ui-polish-level3](../ui-polish-level3/requirements.md) 実装後は同仕様の確認観点も併せて実施する） | ブラウザタブ | REQ-2.2 / 2.3 |
 | M-4 | インストール済みでは案内が表示されない | スタンドアロン | REQ-2.4 |
 | M-5 | 機内モードで起動し、一覧・詳細・新規作成・編集・削除がすべて動作する | | REQ-3.1 |
 | M-6 | 機内モードで写真添付・サイン描画・保存が動作する | | REQ-3.1 |

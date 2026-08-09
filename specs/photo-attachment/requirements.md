@@ -1,6 +1,6 @@
 # 要件: 写真の添付
 
-関連: [設計](./design.md) / [概要](../00-overview.md) / [ダイビングログCRUD](../dive-log-crud/requirements.md)
+関連: [設計](./design.md) / [概要](../00-overview.md) / [ダイビングログCRUD](../dive-log-crud/requirements.md) / [写真の拡大表示](../photo-lightbox/requirements.md)
 
 ## 概要
 
@@ -16,3 +16,5 @@
 - REQ-6: ユーザーがフォームを送信したとき、システムは新規写真をすべて保存し、削除マークの付いた既存写真をすべて削除し、ログの `photoIds` を最新の状態に更新するものとする。
 - REQ-7: ダイビングログの詳細画面では、システムは紐づく写真をすべて画像として表示するものとする。
 - REQ-8: ダイビングログが削除されたとき、システムは紐づく写真もすべて削除するものとする（[dive-log-crud REQ-5.2](../dive-log-crud/requirements.md)）。
+
+> REQ-7 で表示するサムネイルをタップして写真を拡大表示する機能は [photo-lightbox](../photo-lightbox/requirements.md) で扱う。同仕様は表示の追加のみを行い、本仕様の表示内容（表示する写真の枚数・順序）と保存の挙動は変更しない（[photo-lightbox REQ-9.3, REQ-9.4](../photo-lightbox/requirements.md)）。

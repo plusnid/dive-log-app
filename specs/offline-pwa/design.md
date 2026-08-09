@@ -9,7 +9,7 @@
 - `registerType: 'autoUpdate'`: 新しいビルドがあれば即座にService Workerを更新（ユーザーへの確認プロンプトなし）。
 - `workbox.globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}']`: プリキャッシュ対象の静的アセットパターン。
 - `manifest`:
-  - `lang: 'ja'`, `name` / `short_name`: 「ダイビングログ」, `description`, `theme_color: '#0b5b7a'`, `background_color: '#ffffff'`
+  - `lang: 'ja'`, `name` / `short_name`: 「ダイビングログ」, `description`, `theme_color: '#0a1a2f'`, `background_color: '#ffffff'`（[ui-polish-level2](../ui-polish-level2/design.md) で深海ネイビーに変更）
   - `display: 'standalone'`, `start_url: '/dive-log-app/'`, `scope: '/dive-log-app/'`（GitHub Pages のサブパス配信のため。決定の経緯は [mobile-compatibility/design.md「配信先の反映」](../mobile-compatibility/design.md#配信先の反映)）
   - Vite 側も `base: '/dive-log-app/'` を指定する（同上）
   - `icons`: `public/icons/icon-192.png`（192x192）, `icon-512.png`（512x512）, `icon-maskable-512.png`（512x512, `purpose: 'maskable'`）

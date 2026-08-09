@@ -132,16 +132,19 @@ function formatConflictTimestamp(iso: string): string {
 export async function createConflictCopy(source: DiveLogSnapshot): Promise<void> {
   const now = new Date().toISOString()
   await db.transaction('rw', db.diveLogs, db.attachments, async () => {
+    const photoUuidMap = new Map<string, string>()
     const photoIds = await Promise.all(
-      source.photos.map((p) =>
-        db.attachments.add({
-          uuid: newUuid(),
+      source.photos.map(async (p) => {
+        const newPhotoUuid = newUuid()
+        photoUuidMap.set(p.uuid, newPhotoUuid)
+        return db.attachments.add({
+          uuid: newPhotoUuid,
           type: 'photo',
           blob: p.blob,
           mimeType: p.blob.type || 'image/jpeg',
           createdAt: now,
-        }),
-      ),
+        })
+      }),
     )
     let signatureId: number | undefined
     if (source.signature) {
@@ -154,8 +157,21 @@ export async function createConflictCopy(source: DiveLogSnapshot): Promise<void>
       })
     }
 
+    // 観察記録の写真参照を、複製後の写真の uuid へ付け替える（REQ-8.4）。
+    // 複製元に存在しない・複製できなかった参照は落とす。観察記録自体の uuid も採番し直し、
+    // 同一の識別子を持つ観察記録が2つのログに存在しないようにする。
+    const observations = source.log.observations?.map((observation) => ({
+      ...observation,
+      uuid: newUuid(),
+      photoUuids: observation.photoUuids.flatMap((uuid) => {
+        const mapped = photoUuidMap.get(uuid)
+        return mapped ? [mapped] : []
+      }),
+    }))
+
     await db.diveLogs.add({
       ...source.log,
+      observations,
       siteName: `${source.log.siteName}（競合コピー ${formatConflictTimestamp(now)}）`,
       uuid: newUuid(),
       photoIds,

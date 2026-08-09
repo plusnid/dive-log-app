@@ -2,10 +2,14 @@
  * 同期エンジンで使う型定義（RemoteLogFile / SyncPlan の実行結果 / 状態など）。
  * `sync/` は React にも Dexie にも依存しない純粋な TypeScript モジュールとする。
  */
-import type { DiveLogDraft } from '../types/diveLog'
+import type { DiveLog } from '../types/diveLog'
 
-/** Drive 上の `logs/<uuid>.json` の `log` フィールド（ローカル専用の id/uuid/photoIds/signatureId/createdAt/updatedAt は含まない）。 */
-export type RemoteLogBody = DiveLogDraft
+/**
+ * Drive 上の `logs/<uuid>.json` の `log` フィールド（ローカル専用の id/uuid/photoIds/signatureId/createdAt/updatedAt は含まない）。
+ * `DiveLogDraft` と異なり、フォームが直接編集しない項目（observations / 廃止済みの gear）も含む
+ * （`toRemoteLogBody()` の rest スプレッドが実際に運ぶ内容と型を一致させるため。REQ-8.6）。
+ */
+export type RemoteLogBody = Omit<DiveLog, 'id' | 'uuid' | 'photoIds' | 'signatureId' | 'createdAt' | 'updatedAt'>
 
 /** Drive 上の `logs/<uuid>.json` ファイルの中身。 */
 export interface RemoteLogFile {

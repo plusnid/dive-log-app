@@ -68,114 +68,120 @@ export function SyncSettingsView({ onBack }: SyncSettingsViewProps) {
     <div className="view">
       <div className="view__header">
         <button type="button" onClick={onBack}>
-          ← 一覧に戻る
+          ← 戻る
         </button>
         <h1>設定</h1>
       </div>
 
-      {syncConfigured && (
-        <section className="sync-settings">
-          <h2>Google Drive 同期</h2>
+      <section className="data-management">
+        <h2>データ管理</h2>
 
-          {!settings.enabled ? (
-            <>
-              <p>
-                同期を有効にすると、あなた自身の Google
-                アカウントに接続し、ダイビングログの記録内容・添付写真・ガイドのサイン画像を、あなたの Google
-                Drive 内に作成する専用フォルダへ保存します。他のユーザーと共有されることはありません。
-              </p>
-              {connectError && (
-                <p className="form-error" role="alert">
-                  {connectError}
+        {syncConfigured && (
+          <div className="sync-settings">
+            <h3>Google Drive 同期</h3>
+
+            {!settings.enabled ? (
+              <>
+                <p>
+                  同期を有効にすると、あなた自身の Google
+                  アカウントに接続し、ダイビングログの記録内容・添付写真・ガイドのサイン画像を、あなたの Google
+                  Drive 内に作成する専用フォルダへ保存します。他のユーザーと共有されることはありません。
                 </p>
-              )}
-              <button type="button" onClick={handleConnect} disabled={connecting}>
-                {connecting ? '接続中...' : 'Google Drive に接続'}
-              </button>
-            </>
-          ) : (
-            <>
-              <dl>
-                <dt>接続中のアカウント</dt>
-                <dd>{settings.accountEmail ?? '取得できませんでした'}</dd>
-                <dt>同期先フォルダ</dt>
-                <dd>ダイビングログ（マイドライブ直下）</dd>
-                <dt>同期状態</dt>
-                <dd>
-                  {status.phase === 'running'
-                    ? '同期中...'
-                    : status.phase === 'error' || status.lastErrorMessage
-                      ? 'エラー'
-                      : settings.lastSyncAt
-                        ? '完了'
-                        : '未同期'}
-                  {status.lastResult?.conflicts ? `（競合 ${status.lastResult.conflicts} 件を検出し、競合コピーを作成しました）` : ''}
-                </dd>
-                <dt>最終同期日時</dt>
-                <dd>{formatDateTime(settings.lastSyncAt)}</dd>
-              </dl>
-
-              {(syncNowError ?? status.lastErrorMessage) && (
-                <p className="form-error" role="alert">
-                  {syncNowError ?? status.lastErrorMessage}
-                </p>
-              )}
-
-              <div className="view__actions">
-                <button type="button" onClick={handleSyncNow} disabled={status.phase === 'running'}>
-                  {status.phase === 'running' ? '同期中...' : '今すぐ同期'}
-                </button>
-              </div>
-
-              <label className="sync-settings__toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.autoSync}
-                  onChange={(e) => void setAutoSync(e.target.checked)}
-                />
-                自動同期を有効にする（アプリ起動時・オンライン復帰時・記録の変更後に自動的に同期します）
-              </label>
-
-              {!showDisconnectConfirm ? (
-                <button type="button" onClick={() => setShowDisconnectConfirm(true)}>
-                  接続を解除
-                </button>
-              ) : (
-                <div className="sync-settings__disconnect-confirm">
-                  <p>
-                    接続を解除しても、Google Drive
-                    上に保存済みのデータは削除されません。完全に削除したい場合は、Drive側で手動削除するか、Googleアカウントの設定画面からこのアプリのアクセス権を取り消してください。
+                {connectError && (
+                  <p className="form-error" role="alert">
+                    {connectError}
                   </p>
-                  <div className="view__actions">
-                    <button type="button" onClick={handleDisconnect}>
-                      解除する
-                    </button>
-                    <button type="button" onClick={() => setShowDisconnectConfirm(false)}>
-                      キャンセル
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-      )}
+                )}
+                <button type="button" onClick={handleConnect} disabled={connecting}>
+                  {connecting ? '接続中...' : 'Google Drive に接続'}
+                </button>
+              </>
+            ) : (
+              <>
+                <dl>
+                  <dt>接続中のアカウント</dt>
+                  <dd>{settings.accountEmail ?? '取得できませんでした'}</dd>
+                  <dt>同期先フォルダ</dt>
+                  <dd>ダイビングログ（マイドライブ直下）</dd>
+                  <dt>同期状態</dt>
+                  <dd>
+                    {status.phase === 'running'
+                      ? '同期中...'
+                      : status.phase === 'error' || status.lastErrorMessage
+                        ? 'エラー'
+                        : settings.lastSyncAt
+                          ? '完了'
+                          : '未同期'}
+                    {status.lastResult?.conflicts
+                      ? `（競合 ${status.lastResult.conflicts} 件を検出し、競合コピーを作成しました）`
+                      : ''}
+                  </dd>
+                  <dt>最終同期日時</dt>
+                  <dd>{formatDateTime(settings.lastSyncAt)}</dd>
+                </dl>
 
-      <section className="storage-status">
-        <h2>ストレージの状態</h2>
-        <p>
-          永続化:{' '}
-          {persisted == null
-            ? '確認中...'
-            : persisted
-              ? '有効（ブラウザによる自動削除の対象になりにくい状態です）'
-              : '無効（ブラウザの判断でデータが削除される場合があります）'}
-        </p>
-        {estimate && (estimate.usage != null || estimate.quota != null) && (
-          <p>
-            使用量の目安: {formatBytes(estimate.usage)} / {formatBytes(estimate.quota)}
-          </p>
+                {(syncNowError ?? status.lastErrorMessage) && (
+                  <p className="form-error" role="alert">
+                    {syncNowError ?? status.lastErrorMessage}
+                  </p>
+                )}
+
+                <div className="view__actions">
+                  <button type="button" onClick={handleSyncNow} disabled={status.phase === 'running'}>
+                    {status.phase === 'running' ? '同期中...' : '今すぐ同期'}
+                  </button>
+                </div>
+
+                <label className="sync-settings__toggle">
+                  <input
+                    type="checkbox"
+                    checked={settings.autoSync}
+                    onChange={(e) => void setAutoSync(e.target.checked)}
+                  />
+                  自動同期を有効にする（アプリ起動時・オンライン復帰時・記録の変更後に自動的に同期します）
+                </label>
+
+                {!showDisconnectConfirm ? (
+                  <button type="button" onClick={() => setShowDisconnectConfirm(true)}>
+                    接続を解除
+                  </button>
+                ) : (
+                  <div className="sync-settings__disconnect-confirm">
+                    <p>
+                      接続を解除しても、Google Drive
+                      上に保存済みのデータは削除されません。完全に削除したい場合は、Drive側で手動削除するか、Googleアカウントの設定画面からこのアプリのアクセス権を取り消してください。
+                    </p>
+                    <div className="view__actions">
+                      <button type="button" onClick={handleDisconnect}>
+                        解除する
+                      </button>
+                      <button type="button" onClick={() => setShowDisconnectConfirm(false)}>
+                        キャンセル
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         )}
+
+        <div className="storage-status">
+          <h3>ストレージの状態</h3>
+          <p>
+            永続化:{' '}
+            {persisted == null
+              ? '確認中...'
+              : persisted
+                ? '有効（ブラウザによる自動削除の対象になりにくい状態です）'
+                : '無効（ブラウザの判断でデータが削除される場合があります）'}
+          </p>
+          {estimate && (estimate.usage != null || estimate.quota != null) && (
+            <p>
+              使用量の目安: {formatBytes(estimate.usage)} / {formatBytes(estimate.quota)}
+            </p>
+          )}
+        </div>
       </section>
     </div>
   )

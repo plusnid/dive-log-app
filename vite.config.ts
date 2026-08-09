@@ -17,7 +17,7 @@ export default defineConfig({
         name: 'ダイビングログ',
         short_name: 'ダイビングログ',
         description: 'ローカルで動作するダイビングログ記録アプリ',
-        theme_color: '#0b5b7a',
+        theme_color: '#0a1a2f',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/dive-log-app/',

@@ -1,20 +1,29 @@
 :root {
-  --text: #1a1a1a;
-  --bg: #f7f7f5;
+  --text: #12212f;
+  --text-muted: #5a6b7c;
+  --bg: #f2f6fa;
   --surface: #ffffff;
-  --border: #dcdcdc;
-  --accent: #0b5b7a;
+  --border: #d3dee8;
+  --accent: #0b6e77;
+  --on-accent: #ffffff;
+  --danger: #b3261e;
+  --font-body: system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', Meiryo,
+    sans-serif;
+  --font-display: var(--font-body);
   color-scheme: light dark;
-  font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
+  font: 16px/1.5 var(--font-body);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #e8e8e8;
-    --bg: #14161a;
-    --surface: #1f2228;
-    --border: #34383f;
-    --accent: #5fb4d8;
+    --text: #e8eef5;
+    --text-muted: #9fb0c4;
+    --bg: #0a1a2f;
+    --surface: #12263f;
+    --border: #2c4a6b;
+    --accent: #4fd1c5;
+    --on-accent: #08243a;
+    --danger: #ff9b93;
   }
 }
 
@@ -51,7 +60,7 @@ button {
 
 button[type='submit'] {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 

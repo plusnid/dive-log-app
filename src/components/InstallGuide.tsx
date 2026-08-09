@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getPlatform, isStandalone } from '../platform/environment'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import './InstallGuide.css'
@@ -13,13 +13,33 @@ function readDismissed(): boolean {
   }
 }
 
+interface InstallGuideProps {
+  /**
+   * 値が変化するたびに案内を再表示する（メニューからの明示的な再表示。REQ-2.18）。
+   * 既定値 0 は「再表示の要求なし」を意味する。
+   * 再マウント（key の付け替え）にしないのは、beforeinstallprompt が一度しか発火せず、
+   * 作り直すと Android の「インストール」ボタンを出せなくなるため。
+   */
+  reopenSignal?: number
+}
+
 /**
  * ブラウザタブ起動時に、プラットフォームに応じたホーム画面追加の案内を表示する（REQ-2.2〜2.4）。
  * 一覧画面の先頭に配置する想定。
  */
-export function InstallGuide() {
+export function InstallGuide({ reopenSignal = 0 }: InstallGuideProps) {
   const [dismissed, setDismissed] = useState(readDismissed)
   const { canInstall, promptInstall } = useInstallPrompt()
+
+  useEffect(() => {
+    if (reopenSignal === 0) return // 初回マウント時は何もしない
+    try {
+      localStorage.removeItem(DISMISSED_KEY)
+    } catch {
+      // 保存できない環境では「閉じた」記憶も残っていないため、何もしなくてよい（REQ-2.23）
+    }
+    setDismissed(false)
+  }, [reopenSignal])
 
   if (isStandalone() || dismissed) return null
 

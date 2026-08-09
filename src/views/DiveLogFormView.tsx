@@ -2,14 +2,18 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { SignaturePad, type SignaturePadHandle } from '../components/SignaturePad'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { PastValuePicker, derivePlaceCandidates } from '../components/PastValuePicker'
+import { WeatherSelect } from '../components/WeatherSelect'
+import { ObservationEditor, type AvailablePhoto } from '../components/ObservationEditor'
 import {
   createDiveLog,
   updateDiveLog,
   getDiveLogDetail,
   findCarryOverSource,
   listPastPlaceValues,
+  listPastObservationValues,
 } from '../db/diveLogRepository'
-import type { Attachment, Current, DiveLog, DiveLogDraft, Weather } from '../types/diveLog'
+import type { Attachment, Current, DiveLog, DiveLogDraft, ObservationDraft } from '../types/diveLog'
+import type { MarineLifeGenre } from '../types/marineLifeOptions'
 import {
   aluminumTankOptions,
   drySuitOptions,
@@ -89,6 +93,11 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
   const [saveError, setSaveError] = useState<string | null>(null)
   const signaturePadRef = useRef<SignaturePadHandle>(null)
 
+  // 観察した生物（REQ-2）。編集時は保存済みの観察記録から復元する。
+  const [observations, setObservations] = useState<ObservationDraft[]>([])
+  const [availablePhotos, setAvailablePhotos] = useState<AvailablePhoto[]>([])
+  const [observationRecords, setObservationRecords] = useState<{ genre?: MarineLifeGenre; name: string }[]>([])
+
   // 過去ログからの参照入力（REQ-8）用の元データ。新規作成・編集のどちらでも使う。
   const [placeRecords, setPlaceRecords] = useState<{ area: string; siteName: string }[]>([])
   // 同日の直前ログからの引き継ぎ（REQ-7）用の状態。編集時は使わない。
@@ -128,6 +137,21 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
       })
       setExistingPhotos(photos)
       setExistingSignatureUrl(signature ? URL.createObjectURL(signature.blob) : null)
+
+      // 保存済みの観察記録をフォームの初期値として読み込む（REQ-2.12）。
+      // Attachment.uuid → Attachment.id の逆引きで PhotoRef に戻す。見つからない uuid は落とす（REQ-3.7）。
+      const byUuid = new Map(photos.map((p) => [p.uuid, p.id as number]))
+      setObservations(
+        (diveLog.observations ?? []).map((o) => ({
+          uuid: o.uuid,
+          genre: o.genre,
+          name: o.name,
+          photos: o.photoUuids.flatMap((u) =>
+            byUuid.has(u) ? [{ kind: 'existing' as const, id: byUuid.get(u)! }] : [],
+          ),
+        })),
+      )
+
       setLoading(false)
     })
     return () => {
@@ -145,6 +169,39 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
       cancelled = true
     }
   }, [])
+
+  // 観察記録の名前の参照入力（REQ-2.6〜REQ-2.10）用の元データ。新規作成・編集のどちらでも取得する。
+  useEffect(() => {
+    let cancelled = false
+    listPastObservationValues().then((records) => {
+      if (!cancelled) setObservationRecords(records)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // 観察記録に紐づけられる写真プール（保存済み＋未保存の統合、REQ-3.1, REQ-3.5）。
+  // オブジェクトURLは PhotoPicker が内部で作るものとは別インスタンスだが、Blob実体を複製しない軽量なハンドルのため問題にならない。
+  useEffect(() => {
+    const visibleExisting = existingPhotos.filter((p) => !removedPhotoIds.includes(p.id as number))
+    const photos: AvailablePhoto[] = [
+      ...visibleExisting.map((p) => ({
+        ref: { kind: 'existing' as const, id: p.id as number },
+        url: URL.createObjectURL(p.blob),
+        key: `existing-${p.id}`,
+      })),
+      ...newFiles.map((file, index) => ({
+        ref: { kind: 'new' as const, file },
+        url: URL.createObjectURL(file),
+        key: `new-${index}`,
+      })),
+    ]
+    setAvailablePhotos(photos)
+    return () => {
+      photos.forEach((p) => URL.revokeObjectURL(p.url))
+    }
+  }, [existingPhotos, removedPhotoIds, newFiles])
 
   // 新規作成時のマウント時引き継ぎ（REQ-7.1）。
   useEffect(() => {
@@ -204,6 +261,22 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
     setCarriedOverFrom(carryOverSource.date)
   }
 
+  // 写真が取り除かれたとき、観察記録側の参照も整理する（REQ-3.6）。
+  // リポジトリ側でも最終的なサニタイズを行うため、ここでの取りこぼしがあってもデータには不整合が残らない。
+  function handleRemoveExistingPhoto(pid: number) {
+    setRemovedPhotoIds((prev) => [...prev, pid])
+    setObservations((prev) =>
+      prev.map((o) => ({ ...o, photos: o.photos.filter((r) => !(r.kind === 'existing' && r.id === pid)) })),
+    )
+  }
+
+  function handleNewFilesChange(next: File[]) {
+    setNewFiles(next)
+    setObservations((prev) =>
+      prev.map((o) => ({ ...o, photos: o.photos.filter((r) => r.kind !== 'new' || next.includes(r.file)) })),
+    )
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
@@ -215,10 +288,11 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
           newPhotoFiles: newFiles,
           removedPhotoIds,
           newSignatureBlob: signatureBlob,
+          observations,
         })
         onSaved(id)
       } else {
-        const newId = await createDiveLog(draft, newFiles, signatureBlob ?? null)
+        const newId = await createDiveLog(draft, newFiles, signatureBlob ?? null, observations)
         onSaved(newId)
       }
     } catch (error) {
@@ -334,19 +408,7 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
             onChange={(e) => updateField('visibility', numberOrUndefined(e.target.value))}
           />
         </label>
-        <label>
-          天候
-          <select
-            value={draft.weather ?? ''}
-            onChange={(e) => updateField('weather', (e.target.value || undefined) as Weather | undefined)}
-          >
-            <option value="">選択なし</option>
-            <option value="sunny">晴れ</option>
-            <option value="cloudy">曇り</option>
-            <option value="rainy">雨</option>
-            <option value="other">その他</option>
-          </select>
-        </label>
+        <WeatherSelect value={draft.weather} onChange={(value) => updateField('weather', value)} />
         <label>
           流れ
           <select
@@ -480,9 +542,19 @@ export function DiveLogFormView({ id, onSaved, onCancel }: DiveLogFormViewProps)
         <PhotoPicker
           existingPhotos={existingPhotos.map((p) => ({ id: p.id as number, blob: p.blob }))}
           removedExistingIds={removedPhotoIds}
-          onRemoveExisting={(pid) => setRemovedPhotoIds((prev) => [...prev, pid])}
+          onRemoveExisting={handleRemoveExistingPhoto}
           newFiles={newFiles}
-          onNewFilesChange={setNewFiles}
+          onNewFilesChange={handleNewFilesChange}
+        />
+      </fieldset>
+
+      <fieldset>
+        <legend>観察した生物</legend>
+        <ObservationEditor
+          observations={observations}
+          onChange={setObservations}
+          availablePhotos={availablePhotos}
+          nameCandidateRecords={observationRecords}
         />
       </fieldset>
 

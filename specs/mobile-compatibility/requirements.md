@@ -1,8 +1,9 @@
 # 要件: iOS / Android での動作保証（モバイル対応）
 
-関連: [設計](./design.md) / [概要](../00-overview.md) / [オフライン・PWA](../offline-pwa/requirements.md) / [写真添付](../photo-attachment/requirements.md) / [ガイドサイン](../guide-signature/requirements.md)
+関連: [設計](./design.md) / [概要](../00-overview.md) / [オフライン・PWA](../offline-pwa/requirements.md) / [写真添付](../photo-attachment/requirements.md) / [ガイドサイン](../guide-signature/requirements.md) / [UI仕上げ レベル3](../ui-polish-level3/requirements.md)
 
 ステータス: 実装済み（対応を保留した項目は「対象外」節および [設計](./design.md) の「既知の制約・リスク」を参照。動作確認マトリクス（REQ-7、[設計](./design.md#動作確認マトリクスreq-7)）の実機検証は別途実施）
+※ REQ-2.3 の例外として追記した「メニューからの明示的な再表示」は [ui-polish-level3](../ui-polish-level3/requirements.md) で仕様化しており、同仕様の実装をもって満たされる（本仕様側の実装変更は `InstallGuide` への任意prop追加のみ）。
 
 ## 概要
 
@@ -39,7 +40,7 @@
 
 - REQ-2.1: Android Chrome でインストール要件が満たされたとき、システムはブラウザ標準のインストール導線（インストールバナー／メニュー）を利用可能にするものとする。
 - REQ-2.2: ユーザーがブラウザタブでアプリを開いており、かつ未インストールのとき、システムは実行中のプラットフォームに応じたインストール手順の案内を表示するものとする（iOS: 共有メニュー →「ホーム画面に追加」、Android: メニュー →「アプリをインストール」）。
-- REQ-2.3: ユーザーが案内を閉じたとき、システムはその選択を記憶し、同一ブラウザでは再表示しないものとする。
+- REQ-2.3: ユーザーが案内を閉じたとき、システムはその選択を記憶し、同一ブラウザでは再表示しないものとする。ただし、ユーザーがメニューから明示的に再表示を求めた場合は再表示してよいものとし（[ui-polish-level3 REQ-2.16〜REQ-2.24](../ui-polish-level3/requirements.md)）、再表示後に改めて閉じたときは本要件のとおり再び記憶するものとする。
 - REQ-2.4: アプリがスタンドアロン起動されているとき、システムはインストール案内を表示しないものとする。
 - REQ-2.5: システムは、iOS のホーム画面アイコンとして正しく表示されるアイコン（`apple-touch-icon`）と、Android のアダプティブアイコンに対応するマスカブルアイコンの双方を提供するものとする（[offline-pwa REQ-5](../offline-pwa/requirements.md) の具体化）。
 - REQ-2.6: インストール済みアプリが起動されたとき、システムはブラウザUIを表示しないスタンドアロン表示で起動するものとする（[offline-pwa REQ-3](../offline-pwa/requirements.md)）。

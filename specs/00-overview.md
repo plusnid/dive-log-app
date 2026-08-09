@@ -20,11 +20,16 @@
 | オフライン動作・PWA化 | [offline-pwa](./offline-pwa/requirements.md) | 実装済み |
 | iOS / Android での動作保証（モバイル対応） | [mobile-compatibility](./mobile-compatibility/requirements.md) | 実装済み |
 | Google Drive 同期（バックアップ・複数端末同期） | [google-drive-sync](./google-drive-sync/requirements.md) | 実装済み |
+| UI仕上げ レベル1（一覧カードの情報の強弱・余白・アイコン） | [ui-polish-level1](./ui-polish-level1/requirements.md) | 仕様策定中 |
+| UI仕上げ レベル2（テーマカラー・フォント・カードの写真プレビュー） | [ui-polish-level2](./ui-polish-level2/requirements.md) | 仕様策定中 |
+| UI仕上げ レベル3（FAB・ナビゲーション再構成・入力方法の最適化） | [ui-polish-level3](./ui-polish-level3/requirements.md) | 仕様策定中 |
+| 観察した生物の記録・検索 | [marine-life-observation](./marine-life-observation/requirements.md) | 仕様策定中 |
+| 写真の拡大表示（詳細画面のサムネイルのタップ） | [photo-lightbox](./photo-lightbox/requirements.md) | 実装済み |
 
 ## 技術スタック
 
 - **フレームワーク**: React 19 + TypeScript、Vite でビルド
-- **ルーティング**: なし（`src/App.tsx` の `Route` 判別共用体 + `useState` による自前の画面切り替え（一覧・フォーム・詳細・設定の4画面）。React Router 等は未導入）
+- **ルーティング**: なし（`src/App.tsx` の `Route` 判別共用体 + 履歴スタック（`Route[]`、`push` / `replace` / `back` / `dropLog`）による自前の画面切り替え（一覧・フォーム・詳細・設定・生物検索の5画面）。アプリ内部の遷移履歴は持つが、ブラウザの履歴API（`history.pushState` / `popstate`）とは連動しない（[marine-life-observation](./marine-life-observation/requirements.md) 11節）。React Router 等は未導入）
 - **永続化**: [Dexie](https://dexie.org/)（IndexedDB のラッパー）。バックエンドAPIなし
 - **PWA化**: `vite-plugin-pwa`（Service Worker 自動更新、Web App Manifest）
 - **Lint**: oxlint（`.oxlintrc.json`）
@@ -63,9 +68,10 @@ src/
 
 - バックアップ・複数デバイス間の同期機能 → [google-drive-sync](./google-drive-sync/requirements.md) として実装済み（既定は無効。ユーザーが設定画面で明示的に有効化した場合のみ、本人のGoogle Driveと同期する）
 - iOS / Android 固有の差異（ホーム画面追加の導線、ストレージ削除ポリシー、カメラ入力の挙動、タッチ操作）への対応 → [mobile-compatibility](./mobile-compatibility/requirements.md) として実装済み（入力欄タップ時のiOS自動ズーム対策のみ対応保留、詳細は同design.mdの既知の制約・リスクを参照）
-- 手動のエクスポート／インポート（JSON/CSVファイル）は未仕様（Google Drive同期とは別機能として要検討）
-- 一覧の検索・フィルタ・並び替え（日付降順固定）なし
-- 削除確認は `window.confirm` によるブラウザ標準ダイアログ
+- 手動のエクスポート／インポート（JSON/CSVファイル）は未仕様（Google Drive同期とは別機能として要検討）。[ui-polish-level3](./ui-polish-level3/requirements.md) の「データ管理」は既存の設定画面（同期・ストレージ状態）への導線の再配置のみを扱い、入出力機能そのものは含まない
+- 一覧の検索・フィルタ・並び替え（日付降順固定）なし。[marine-life-observation](./marine-life-observation/requirements.md) は「観察した生物から該当ログを引く」専用の検索導線のみを扱い、ダイビングログ一覧そのものの検索・フィルタ・並び替えは引き続き未仕様
+- 削除確認は `window.confirm` によるブラウザ標準ダイアログ。アプリ独自のモーダル・オーバーレイ部品は現状存在しない（メニュー・観察記録の行編集はいずれも非モーダルの disclosure パターン）。[photo-lightbox](./photo-lightbox/requirements.md) が初めてのモーダル型オーバーレイ（画像の拡大表示専用）を追加するが、確認ダイアログの置き換えは対象外
 - 自動テスト（unit/e2e）なし
+- UIデザインの改善は段階的に行う方針。レベル1（文字とレイアウトの微調整）を [ui-polish-level1](./ui-polish-level1/requirements.md)、レベル2（テーマカラー・フォント変更、カード内の写真プレビュー）を [ui-polish-level2](./ui-polish-level2/requirements.md)、レベル3（新規記録ボタンのFAB化、ナビゲーション再構成＝メニューへの「設定」と「ホーム画面に追加の案内の再表示」の集約、天候入力のセグメントコントロール化）を [ui-polish-level3](./ui-polish-level3/requirements.md) として仕様化済み
 
 mobile-compatibility の実装により `src/platform/` レイヤーを追加済み（Dexieには非依存）。google-drive-sync の実装により、`src/db/db.ts` の Dexie スキーマに version 2（`uuid` / 墓標 `tombstones` / 同期記録 `syncRecords` / 同期メタ `syncMeta`）が追加され、React にも Dexie にも依存しない `src/sync/` レイヤー（`googleAuth.ts` / `driveClient.ts` / `syncEngine.ts` 等）が加わった。同期は既定で無効であり、`VITE_GOOGLE_CLIENT_ID` が未設定のビルドでは同期関連のUIは表示されない（REQ-1.9）。詳細は各 design.md を参照。

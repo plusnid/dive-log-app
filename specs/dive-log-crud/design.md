@@ -45,11 +45,11 @@ interface DiveLog {
 
 type DiveLogDraft = Omit<
   DiveLog,
-  'id' | 'photoIds' | 'signatureId' | 'createdAt' | 'updatedAt' | 'gear'
+  'id' | 'photoIds' | 'signatureId' | 'createdAt' | 'updatedAt' | 'gear' | 'observations'
 >
 ```
 
-`DiveLogDraft` はフォームが扱う「保存前の入力値」。写真・サインID・メタデータはリポジトリ層が計算して付与する。`gear` を `Omit` に加えることで、フォームからは旧項目を書き込めなくする（実装上の `uuid` も現状どおり `Omit` 対象）。
+`DiveLogDraft` はフォームが扱う「保存前の入力値」。写真・サインID・メタデータはリポジトリ層が計算して付与する。`gear` を `Omit` に加えることで、フォームからは旧項目を書き込めなくする（実装上の `uuid` も現状どおり `Omit` 対象）。`observations`（[marine-life-observation](../marine-life-observation/requirements.md)）も同じ理由で `Omit` に含まれる: 写真参照の解決（`Attachment.uuid` の確定）がリポジトリ層でのみ可能なため、フォームは `ObservationDraft[]` を独立した引数として渡す。
 
 `area` は `siteName` と同じ基本情報カテゴリに属する独立した任意項目（REQ-2.6）。エリアを表す別テーブルや参照ID（外部キー）は作らず、ログ1件ごとの文字列として持つ。フォーム上は他の任意テキスト項目（`buddyName` / `guideName`）と同様に空文字 `''` を初期値とし、リポジトリ層に渡る値も含めて空文字は「未入力」として扱う（表示側は `diveLog.area || '-'` のように falsy 判定する）。過去ログからの参照入力（REQ-8）も最終的にこの文字列へ値を書き込むだけで、参照元ログのIDは保持しない（REQ-8.11）。
 
@@ -130,8 +130,8 @@ class DiveLogDatabase extends Dexie {
 
 UIコンポーネントは Dexie を直接呼ばず、以下の関数のみを使う。
 
-- `createDiveLog(draft, photoFiles, signatureBlob)`: `db.transaction('rw', diveLogs, attachments)` 内で添付を先に保存してIDを確定させ、`DiveLog` を1件 `add`。
-- `updateDiveLog(id, draft, { newPhotoFiles, removedPhotoIds, newSignatureBlob })`: 既存レコードを取得し、削除対象添付の `bulkDelete`、新規写真の追加、`photoIds` の再計算、サインの差し替えロジック（[guide-signature/design.md](../guide-signature/design.md) 参照）を行った上で `update`。
+- `createDiveLog(draft, photoFiles, signatureBlob, observations)`: `db.transaction('rw', diveLogs, attachments)` 内で添付を先に保存してIDを確定させ、`DiveLog` を1件 `add`。`observations`（[marine-life-observation](../marine-life-observation/design.md)、既定値 `[]`）は保存した写真の `Attachment.uuid` へ解決したうえで書き込む。
+- `updateDiveLog(id, draft, { newPhotoFiles, removedPhotoIds, newSignatureBlob, observations })`: 既存レコードを取得し、削除対象添付の `bulkDelete`、新規写真の追加、`photoIds` の再計算、サインの差し替えロジック（[guide-signature/design.md](../guide-signature/design.md) 参照）を行った上で `update`。`observations` が `undefined` のときは既存の観察記録を変更しない（[marine-life-observation](../marine-life-observation/design.md) の「リポジトリ層」参照）。
 - `deleteDiveLog(id)`: ログに紐づく `photoIds` + `signatureId` をまとめて `bulkDelete` してからログ本体を `delete`（カスケード削除）。
 - `getDiveLogDetail(id)`: ログ本体と、紐づく写真配列・サイン（あれば）をまとめて返す `DiveLogDetail` を組み立てる（`attachments.bulkGet` / `attachments.get`）。
 
@@ -158,7 +158,7 @@ export async function listPastPlaceValues(): Promise<{ area: string; siteName: s
 
 - `App.tsx`: `Route = { view: 'list' } | { view: 'form', id? } | { view: 'detail', id }` を `useState` で保持し、3画面を出し分ける自前ルーター。React Router 等のライブラリは使わない。
 - `views/DiveLogListView.tsx`: `hooks/useDiveLogs.ts`（`dexie-react-hooks` の `useLiveQuery` で `diveLogs.orderBy('date').reverse()` を購読）を使い、一覧を表示。DBの変更はリアルタイムに反映される。
-- `components/DiveLogListItem.tsx`: 1行分の表示（日付・エリア名・サイト名・任意メタ情報）。エリア名はサイト名と同じ `dive-log-list-item__main` 行に、サイト名の直前に補助的な文字列として出す。`area` が空のときは要素自体をレンダリングしない（REQ-1.5）ため、区切り文字や余白はエリア名側の要素に持たせ、サイト名の表示は従来どおりとする。器材項目は一覧に出さない（REQ-1.6）ため変更なし。
+- `components/DiveLogListItem.tsx`: 1行分の表示（日付・エリア名・サイト名・任意メタ情報）。日付・エリア名+サイト名・メタ行を縦3段（すべて左揃え）で表示する（[ui-polish-level1](../ui-polish-level1/design.md) によりレイアウトを変更、`dive-log-list-item__main` 行は廃止）。エリア名は `dive-log-list-item__site-group` 内でサイト名の直前に補助的な文字列として出す。`area` が空のときは要素自体をレンダリングしない（REQ-1.5）ため、区切り文字や余白はエリア名側の要素に持たせ、サイト名の表示は従来どおりとする。器材項目は一覧に出さない（REQ-1.6）ため変更なし。
 - `components/PastValuePicker.tsx`（新規）: 「参照」ボタンと候補一覧パネルをセットにした再利用部品。
   ```tsx
   interface PastValuePickerProps {
@@ -204,7 +204,7 @@ export async function listPastPlaceValues(): Promise<{ area: string; siteName: s
 - `views/DiveLogDetailView.tsx`: `getDiveLogDetail` で取得した内容を分類ごとの `<section>` に表示。削除は `window.confirm` 確認後に `deleteDiveLog` を呼び、一覧へ戻る。
   - 基本情報セクションの `<dl>` 先頭に `エリア` の `<dt>` / `<dd>` を追加し、未入力時は `-` を表示する（REQ-3.4）。見出し `<h1>` はダイビングポイント名のままとし、エリア名で置き換えたり結合したりはしない。
   - 器材・エア管理セクションの `<dl>` を `ドライスーツ` / `ウェットスーツ` / `フード` / `フードベスト` / `アルミタンク` / `スチールタンク` / `タンク圧力（開始/終了）` / `ウェイト` に変更する（REQ-6.11）。選択リストは `gearLabel(...)` で日本語化し、未選択は `-`。フード類は `diveLog.hood ? '着用' : '-'`。
-  - 旧 `gear` は `{diveLog.gear && (<><dt>使用器材（旧項目）</dt><dd>{diveLog.gear}</dd></>)}` のように値があるときだけ出す（REQ-6.10）。ローカルの `weatherLabel` / `currentLabel` はそのまま残す（器材のラベルのみ `types/gearOptions.ts` に集約）。
+  - 旧 `gear` は `{diveLog.gear && (<><dt>使用器材（旧項目）</dt><dd>{diveLog.gear}</dd></>)}` のように値があるときだけ出す（REQ-6.10）。天候のラベルは [ui-polish-level3](../ui-polish-level3/design.md) により `src/types/weatherOptions.ts` の `weatherLabel()` に集約され、ローカル定義は廃止された（器材のラベルと同じ「型＋ラベル配列＋関数」の形に揃った）。ローカルの `currentLabel`（流れ）は今回のスコープ外のためそのまま残る。
 
 ## Google Drive 同期への影響
 
@@ -212,14 +212,14 @@ export async function listPastPlaceValues(): Promise<{ area: string; siteName: s
 
 旧 `gear` については次の点に注意する。
 
-- `RemoteLogBody` は `DiveLogDraft` のエイリアスであり、`gear` を `Omit` した結果として**型上は `gear` を含まなくなる**。一方で `toRemoteLogBody()` の rest スプレッドは実行時には `gear` を含み、`syncRepository.applyRemoteLog()` の `{ ...remoteLog }` も受け取った値をそのまま書き戻すため、旧項目の値は端末間で保持される。この「型には出ないが実行時には運ばれる」構造は意図的なものであり、rest スプレッドを明示的なフィールド列挙に置き換えると旧データが同期で失われるので変更しない。
+- `RemoteLogBody` は `Omit<DiveLog, 'id' | 'uuid' | 'photoIds' | 'signatureId' | 'createdAt' | 'updatedAt'>`（[marine-life-observation/design.md](../marine-life-observation/design.md) で `DiveLogDraft` のエイリアスから変更済み。フォームが直接編集しない `observations` も型に含めるため）。`gear` は既存の型定義上すでに含まれず、`toRemoteLogBody()` の rest スプレッドは実行時には `gear` を含み、`syncRepository.applyRemoteLog()` の `{ ...remoteLog }` も受け取った値をそのまま書き戻すため、旧項目の値は端末間で保持される。この「型には出ないが実行時には運ばれる」構造は意図的なものであり、rest スプレッドを明示的なフィールド列挙に置き換えると旧データが同期で失われるので変更しない。
 - `logs/<uuid>.json` のサンプルに含まれる `gear` は旧項目として扱う（[google-drive-sync/design.md](../google-drive-sync/design.md) のサンプルを新項目に合わせて更新済み）。
 
 同期そのものの有効・無効に関わらず、引き継ぎ（REQ-7）と参照入力（REQ-8）はローカルの `diveLogs` テーブルのみを参照する。オフラインでも動作し、外部通信は発生しない（[概要](../00-overview.md) NFR-1, NFR-2）。
 
 ## 既知の設計上のトレードオフ
 
-- `useState` ベースの独自ルーティングのため、ブラウザの戻る/進むボタンやURL共有には対応していない。
+- 独自ルーティング（`src/App.tsx` の履歴スタック）はアプリ内部の遷移履歴を持つが（[marine-life-observation/design.md](../marine-life-observation/design.md) 10節）、ブラウザの履歴API（`history.pushState` / `popstate`）とは連動しない。ブラウザの戻る/進むボタン・URL共有・ディープリンクには対応していない。
 - フォームのバリデーションはHTML標準の `required` のみで、業務ルール（例: 終了圧力 < 開始圧力、ドライとウェットの同時選択など）のチェックはない。
 - エリア名・ダイビングポイント名はマスタ管理せず自由記述のため、同じ場所でも表記ゆれ（「石垣島」/「石垣」）が生じうる。参照入力（REQ-8）は「過去に自分が入力した文字列をそのまま再利用する」ことで表記ゆれの発生を減らすだけの仕組みであり、既に存在する表記ゆれの名寄せ・正規化・統合リネームは行わない。エリア／ポイントでの絞り込み検索も引き続き未実装（一覧の検索・フィルタ自体が未実装、[概要](../00-overview.md) の既知の制約を参照）。
 - 参照候補は毎回 `diveLogs` の全件走査から導出するため、ログ件数が非常に多くなるとフォームの初期表示が遅くなる可能性がある（現実的な件数では問題にならない想定。必要になった時点でキャッシュやインデックスを検討する）。
