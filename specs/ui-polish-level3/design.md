@@ -35,30 +35,13 @@
 
 ### 1-1. 現状（調査結果）
 
-`src/views/DiveLogListView.tsx` のヘッダーに、設定ボタンと「+ 新規記録」ボタンが横並びで置かれている。
+`src/views/DiveLogListView.tsx` のヘッダーには現在、`view__header` > `view__actions` の中に設定ボタンと「+ 新規記録」ボタンが横並びで置かれている（1-3 の新マークアップで `AppMenu` / `Fab` に置き換える）。
 
-```tsx
-<div className="view__header">
-  <h1>ダイビングログ</h1>
-  <div className="view__actions">
-    <button type="button" onClick={onOpenSettings} aria-label="設定">設定</button>
-    <button type="button" onClick={onNewDive}>+ 新規記録</button>
-  </div>
-</div>
-```
+`App.tsx` から渡る props は `onSelectDive` / `onNewDive` / `onOpenSettings` の3つで、**本仕様では props を変更しない**（呼び出し元＝ `App.tsx` を触らずに済む）。`src/index.css` の `#root` は `max-width: 640px` の中央寄せで `padding` に `env(safe-area-inset-*)` を加算済み（[mobile-compatibility](../mobile-compatibility/design.md)、`min-height: 100svh`）。共通の `button` スタイル（`min-height`/`min-width: 44px` / `padding: 0.5rem 0.9rem` / `border-radius: 6px` / `background: var(--surface)`）はFABが上書きする。一覧画面の先頭には `InstallGuide`（未インストール時のみ）が入るが、FABは固定配置のため干渉しない。
 
-- `App.tsx` から渡る props は `onSelectDive` / `onNewDive` / `onOpenSettings` の3つ。**本仕様では props を変更しない**（呼び出し元＝ `App.tsx` を触らずに済む）。
-- `src/index.css` の `#root` は `max-width: 640px` の中央寄せで、`padding` に `env(safe-area-inset-*)` を加算済み（[mobile-compatibility](../mobile-compatibility/design.md)）。`min-height: 100svh`。
-- 共通の `button` スタイルは `min-height: 44px` / `min-width: 44px` / `padding: 0.5rem 0.9rem` / `border-radius: 6px` / `background: var(--surface)`。FABはこれを上書きする。
-- 一覧画面の先頭には `InstallGuide`（未インストール時のみ）が入る。FABは固定配置なのでこれと干渉しない。
+### 1-2. 配置方式
 
-### 1-2. 配置方式の比較
-
-| 方式 | 判定 | 理由 |
-| --- | --- | --- |
-| `position: fixed` の円形ボタン（採用） | **採用** | スクロールに追従せず常に同じ位置（REQ-1.3）。既存のレイアウトに手を入れずに済む |
-| `position: sticky` でリスト末尾に置く | 不採用 | 一覧が短いときに画面下部に来ない。空状態（0件）でも表示する要件（REQ-1.12）と相性が悪い |
-| ヘッダーを `position: sticky` にして「+ 新規記録」を残す | 不採用 | 片手・親指で届く位置に主要操作を移すという目的（レベル3の主旨）を満たさない |
+`position: fixed` の円形ボタンを採用（REQ-1.3、既存レイアウトに手を入れずに済む）。`position: sticky` でリスト末尾に置く案は、一覧が短いときや空状態（REQ-1.12）で画面下部に来ないため不採用。ヘッダーに「+ 新規記録」を残す案は、片手・親指で届く位置に主要操作を移すというレベル3の主旨を満たさないため不採用。
 
 ### 1-3. コンポーネント
 
@@ -149,21 +132,13 @@ interface FabProps {
 
 ### 2-1. 現状（調査結果）
 
-- 遷移先は `Route = { view: 'list' } | { view: 'form'; id? } | { view: 'detail'; id } | { view: 'settings' }` の4つ。**一覧画面から明示的に開ける画面は「設定」だけ**（フォーム・詳細はログに紐づく操作から開く）。
-- `SyncSettingsView` の中身は次の2セクションのみ。
-  1. `Google Drive 同期`（`isSyncConfigured()` が `false`＝`VITE_GOOGLE_CLIENT_ID` 未設定のビルドでは**セクションごと非表示**。[google-drive-sync REQ-1.9](../google-drive-sync/requirements.md)）
-  2. `ストレージの状態`（永続化の可否・使用量の目安。[mobile-compatibility REQ-3.4](../mobile-compatibility/requirements.md)）
-- **JSON/CSVのエクスポート・インポート機能はコードベースに存在しない**（`src/` 全体を検索して、ファイル出力・ファイル読み込みの実装は写真添付の `input[type=file]` のみ）。[概要の既知の制約](../00-overview.md)の記述と一致する。
+遷移先は `Route = { view: 'list' } | { view: 'form'; id? } | { view: 'detail'; id } | { view: 'settings' }` の4つ。**一覧画面から明示的に開ける画面は「設定」だけ**（フォーム・詳細はログに紐づく操作から開く）。`SyncSettingsView` の中身は次の2セクションのみ: (1) `Google Drive 同期`（`isSyncConfigured()` が `false`＝`VITE_GOOGLE_CLIENT_ID` 未設定のビルドでは**セクションごと非表示**。[google-drive-sync REQ-1.9](../google-drive-sync/requirements.md)）、(2) `ストレージの状態`（永続化の可否・使用量の目安。[mobile-compatibility REQ-3.4](../mobile-compatibility/requirements.md)）。**JSON/CSVのエクスポート・インポート機能はコードベースに存在しない**（`src/` 全体を検索して、ファイル出力・ファイル読み込みの実装は写真添付の `input[type=file]` のみ）。[概要の既知の制約](../00-overview.md)の記述と一致する。
 
 したがって原文の「データ管理機能をまとめる」は、**現時点では「同期」と「ストレージの状態」を指す**。エクスポート／インポートの新規実装は本仕様の対象外とする（REQ-2.12、[未確定事項 2](./requirements.md#未確定事項確認したい点)）。
 
-### 2-2. ナビゲーション方式の比較
+### 2-2. ナビゲーション方式
 
-| 方式 | 実装量 | FABとの関係 | 拡張性 | 判定 |
-| --- | --- | --- | --- | --- |
-| **案A: ヘッダー右のハンバーガーボタン＋ドロップダウン** | 中（開閉・Esc・外側タップ・aria） | 干渉しない（画面上部） | メニュー項目を足すだけ | **推奨** |
-| 案B: ヘッダー右の歯車アイコンボタンのみ | 小（既存ボタンをアイコン化するだけ） | 干渉しない | 項目が増えたら作り直し | 次点。原文の「メニューにまとめる」からは外れる |
-| 案C: 下部タブバー（ログ／設定） | 大（`App.tsx` に全画面共通のUIを追加、各画面の下部余白調整） | **干渉する**（FABをタブバーの上へ押し上げる必要がある） | タブは3〜5項目向き。現状2項目は過剰 | 非推奨 |
+ヘッダー右のハンバーガーボタン＋パネル（案A）を採用。FABと干渉せず（画面上部）、項目追加も容易。次点は歯車アイコンボタンのみ（案B、原文の「メニューにまとめる」から外れる）。下部タブバー（案C）はFABをタブバーの上へ押し上げる必要があり干渉するうえ、現状2項目にはタブは過剰なため不採用。
 
 以下は案Aを前提に設計する。案Bを採る場合は `AppMenu` を単純なアイコンボタンに縮約すればよく、`DiveLogListView` 側の構造は変わらない。
 
@@ -212,17 +187,13 @@ interface AppMenuProps {
 </div>
 ```
 
-- **`role="menu"` / `role="menuitem"` を使わない理由**: これらはアプリケーションメニュー（矢印キーによるロービングtabindex、Tabで抜ける、Home/End対応など）のキーボード仕様一式の実装を前提とする。ここでの用途は「画面遷移リンクの集合」であり、WAI-ARIA Authoring Practices も単純な遷移メニューには disclosure（開閉ボタン＋通常のボタン/リンク並び）を推奨している。Tab移動が素直に効き、実装量も少ない（REQ-2.7 の「フォーカスをメニュー内に閉じ込める」ではなく「外へ出たら閉じる」方式を採る）。
+- **`role="menu"` / `role="menuitem"` を使わない理由**: これらはロービングtabindex等のアプリケーションメニュー仕様一式の実装を前提とする。ここでの用途は「画面遷移リンクの集合」であり、WAI-ARIA Authoring Practices もこの用途には disclosure（開閉ボタン＋通常のボタン/リンク並び）を推奨する。Tab移動が素直に効き実装量も少ない（REQ-2.7 は「フォーカスを閉じ込める」ではなく「外へ出たら閉じる」方式）。
 - **開閉状態の伝達**: `aria-expanded`（REQ-2.4）と `aria-controls`。閉じているときはパネルをDOMから外す（条件付きレンダリング。`PastValuePicker` と同じ流儀）。
-- **Escキー**: パネルが開いている間だけ `keydown` を購読し、`Escape` で `setOpen(false)` して `triggerRef.current?.focus()`（REQ-2.5）。
-- **外側タップ**: 開いている間だけ `document` の `pointerdown` を購読し、`containerRef.current?.contains(event.target)` が偽なら閉じる（REQ-2.6）。`click` ではなく `pointerdown` にするのは、iOS Safari で `click` が発火しないケース（非インタラクティブ要素）を避けるため。
-- **フォーカスアウト**: `containerRef` に `onFocusOut`（React では `onBlur` がバブルする）を張り、`relatedTarget` がコンテナ外なら閉じる（REQ-2.7）。閉じてもフォーカスは移動先の要素にあるため、フォーカスが失われることはない。
-- **開いた直後のフォーカス**: 最初の項目へ移す（`useEffect` で `panelRef.current?.querySelector('button')?.focus()`）。キーボード利用者がTabを1回余分に押さずに済む。
-- **項目選択**: 閉じてから遷移する（REQ-2.8）。実際には `onOpenSettings()` で画面全体が入れ替わり `AppMenu` はアンマウントされるが、状態の後始末を明示しておく。
-- **画面遷移を伴わない項目**（「ホーム画面に追加の案内」）: `setOpen(false)` の後も `AppMenu` は一覧画面に残る。パネル内の項目ボタンにフォーカスがある状態でパネルがDOMから外れるとフォーカスが `body` に落ちるため（REQ-2.7 が禁じる状態）、**閉じるときは `triggerRef.current?.focus()` でメニューボタンへ戻す**。Escキー時（REQ-2.5）と同じ後始末を、項目選択時にも共通の `close()` 関数として通す設計にする。
-- **スタンドアロン起動時の項目非表示**: `isStandalone()`（`src/platform/environment.ts`、機能検出ベース。REQ-5.7）が真のときは「ホーム画面に追加の案内」を描画しない（REQ-2.17）。判定は開いているパネルのレンダリング時に行う。起動形態は実行中に変わらないため、状態として保持せず都度呼び出しでよい（同関数は `matchMedia` の評価のみで副作用を持たない）。**無効化（`disabled`）ではなく非表示**とするのは、押せない項目が並ぶよりも、その環境で意味のある項目だけを見せるほうが分かりやすいため。この結果、スタンドアロン起動時のメニュー項目は「設定」1つになる。
+- **閉じ方3種**: (1) Escキー — パネルが開いている間だけ `keydown` を購読し、`Escape` で `setOpen(false)` して `triggerRef.current?.focus()`（REQ-2.5）。(2) 外側タップ — 開いている間だけ `document` の `pointerdown` を購読し、`containerRef.current?.contains(event.target)` が偽なら閉じる（REQ-2.6）。`click` ではなく `pointerdown` なのは iOS Safari で `click` が発火しないケース（非インタラクティブ要素）を避けるため。(3) フォーカスアウト — `containerRef` に `onFocusOut`（`onBlur` がバブル）を張り、`relatedTarget` がコンテナ外なら閉じる（REQ-2.7）。いずれもフォーカス移動先が別要素にあるため、フォーカスが失われることはない。
+- **フォーカス管理**: 開いた直後は最初の項目へ移す（`useEffect` で `panelRef.current?.querySelector('button')?.focus()`）。「設定」選択時は閉じてから遷移する（REQ-2.8。`onOpenSettings()` で画面全体が入れ替わり `AppMenu` はアンマウントされる）。画面遷移を伴わない「ホーム画面に追加の案内」は選択後も `AppMenu` が一覧画面に残るため、パネルがDOMから外れる前にフォーカスが `body` へ落ちないよう（REQ-2.7が禁じる状態）**閉じるときは常に `triggerRef.current?.focus()` でメニューボタンへ戻す**。Esc・外側タップ・項目選択のいずれも共通の `close()` 関数を通す設計にする。
+- **スタンドアロン起動時の項目非表示**: `isStandalone()`（`src/platform/environment.ts`、機能検出ベース。REQ-5.7）が真のときは「ホーム画面に追加の案内」を描画しない（REQ-2.17。判定はパネルのレンダリング時に都度行い、状態には保持しない）。**無効化（`disabled`）ではなく非表示**とするのは、押せない項目より意味のある項目だけを見せるほうが分かりやすいため。結果、スタンドアロン起動時のメニュー項目は「設定」1つになる。
 
-モーダルなドロワー（画面左からスライド）にする場合は、フォーカストラップ（Tabの循環）＋背景の `inert` ＋オーバーレイのクリックで閉じる、が必要になる。[未確定事項 3](./requirements.md#未確定事項確認したい点) で確定する。
+モーダルなドロワー（画面左からスライド、フォーカストラップ＋背景の `inert` ＋オーバーレイクリックで閉じるが必要）は不採用。非モーダルの disclosure を採用（[未確定事項 3](./requirements.md#未確定事項確認したい点)で確定）。
 
 CSS:
 
@@ -246,8 +217,7 @@ CSS:
   └ ストレージの状態
 ```
 
-- 実装案（最小）: 既存の2つの `<section>` を1つの `<section>` でくくり、`<h2>データ管理</h2>` の下に既存の見出しを `<h3>` として並べる。
-- 代案（さらに最小）: 見出し階層は現状のまま（`<h2>` 2つ）とし、将来エクスポート／インポートが入った時点で「データ管理」セクションを作る。→ [未確定事項 2](./requirements.md#未確定事項確認したい点) と併せて判断する。
+- 実装: 既存の2つの `<section>` を1つの `<section>` でくくり、`<h2>データ管理</h2>` の下に既存の見出しを `<h3>` として並べる（[未確定事項 2](./requirements.md#未確定事項確認したい点)と併せて判断）。
 - 同期未構成のビルドでは「データ管理」セクションの中身が「ストレージの状態」だけになるが、設定画面への導線は維持する（REQ-2.13）。
 - 戻る導線（`← 一覧に戻る`）は現状のまま維持する（REQ-2.14）。
 
@@ -259,25 +229,15 @@ CSS:
 
 `src/components/InstallGuide.tsx` は props を取らない自己完結コンポーネントで、`DiveLogListView` の先頭に `<InstallGuide />` と置かれているだけ。
 
-- `const DISMISSED_KEY = 'dive-log-app:install-guide-dismissed'` はモジュール内に閉じている（外部から参照できない）。
-- `const [dismissed, setDismissed] = useState(readDismissed)` — `localStorage` を読むのは**マウント時の1回だけ**。以後は再読み込みしない。
-- `dismiss()` が `localStorage.setItem(DISMISSED_KEY, 'true')`（`try/catch` で保存不可環境を握りつぶす）と `setDismissed(true)` を行う。
-- `if (isStandalone() || dismissed) return null` の早期returnは、フック呼び出しより**後**にある。
-- 内部で `useInstallPrompt()` を呼び、`beforeinstallprompt` を捕捉して `canInstall` を出している。
+`DISMISSED_KEY = 'dive-log-app:install-guide-dismissed'` はモジュール内プライベート。`useState(readDismissed)` で `localStorage` を**マウント時の1回だけ**読み、`dismiss()` が `localStorage.setItem(DISMISSED_KEY, 'true')`（`try/catch` で保存不可環境を握りつぶす）と `setDismissed(true)` を行う。`if (isStandalone() || dismissed) return null` の早期returnはフック呼び出しより**後**にあり、内部の `useInstallPrompt()` が `beforeinstallprompt` を捕捉して `canInstall` を出している。
 
 **設計を縛る重要な事実**: `beforeinstallprompt` はページ読み込み時に一度だけ発火する。`InstallGuide` は非表示（`return null`）の間もマウントされたままで、`useInstallPrompt` の `useEffect` がイベントを捕捉し続けている。したがって **`InstallGuide` をアンマウント→再マウントすると捕捉済みイベントを失い、Android の「インストール」ボタンを出せなくなる**（[mobile-compatibility REQ-2.1](../mobile-compatibility/requirements.md) の劣化、REQ-2.22 に反する）。再表示の実装方式はこの制約を満たす必要がある。
 
-#### 2-5-2. 方式の比較
+#### 2-5-2. 方式の選定
 
-| 方式 | `InstallGuide` への変更量 | `beforeinstallprompt` の保持 | 判定 |
-| --- | --- | --- | --- |
-| 案ア: 親が `key` をインクリメントして再マウント（併せて `localStorage` のキーを削除） | 小（キー削除用の関数を1つ追加exportするだけ。propsは不変） | **失われる**（再マウントで `useInstallPrompt` が初期化される） | 不採用 |
-| **案イ: 再表示シグナル（任意の数値prop）＋ `useEffect` で `dismissed` を戻す** | 小（任意prop 1つ＋`useEffect` 1つ。表示ロジック・文言は不変） | 保持される（マウントを維持するため） | **採用** |
-| 案ウ: `dismissed` と永続化を親（`DiveLogListView`）へ持ち上げ、完全にprops駆動にする | 大（記憶の責務が親へ移り、コンポーネントの自己完結性が失われる） | 保持される | 不採用 |
-| 案エ: `useSyncExternalStore` やカスタムイベントで `localStorage` の変更を購読する | 中（購読機構を新設） | 保持される | 不採用（1画面内の単発操作に対して機構が重い） |
-| 案オ: `useImperativeHandle` で `reopen()` を公開し、親が ref 経由で呼ぶ | 中（`forwardRef` 化。命令的APIになる） | 保持される | 不採用（宣言的な書き方で足りる） |
+再表示シグナル（任意の数値prop）＋ `useEffect` で `dismissed` を戻す方式（案イ）を採用。変更量が最小（任意prop 1つ＋`useEffect` 1つ、表示ロジック・文言は不変）で、マウントを維持するため `beforeinstallprompt` の捕捉も保持される。
 
-「状態のリセットは `key` で」というのがReactの一般的な指針であり、本来なら案アが第一候補になる。ここで採らないのは上記の `beforeinstallprompt` の一回性という**このコンポーネント固有の事情**による。この理由をコード上のコメントにも残す。
+不採用の代替案とその理由: 「状態のリセットは `key` で」というReactの一般的な指針に沿えば、親が `key` をインクリメントして再マウントする案が本来第一候補だが、再マウントで `useInstallPrompt` が初期化され `beforeinstallprompt` の捕捉を**失う**（2-5-1の制約に反する）ため不採用。`dismissed` と永続化を親へ完全に持ち上げる案は、コンポーネントの自己完結性が失われるため不採用。`useSyncExternalStore` 等で `localStorage` の変更を購読する案は、1画面内の単発操作に対して機構が重いため不採用。`useImperativeHandle` で `reopen()` を公開する案は、宣言的な書き方で足りるため不採用。この選定理由はコード上のコメントにも残す。
 
 #### 2-5-3. 採用案（案イ）の実装
 
@@ -313,14 +273,9 @@ export function InstallGuide({ reopenSignal = 0 }: InstallGuideProps) {
 }
 ```
 
-- prop は**任意**なので、既存の呼び出し `<InstallGuide />` はそのままでも動く。
-- `DISMISSED_KEY` は引き続き `InstallGuide.tsx` の内部に閉じ、キー名を外部へ公開しない。キー名・保存先は変更しない（REQ-5.10。既存利用者の「閉じた」状態をリリースでリセットしない）。
-- `setItem('false')` ではなく `removeItem` にする: 「未設定 ＝ まだ閉じていない」という現状の `readDismissed()` の判定（`=== 'true'`）と素直に噛み合う。
-- `removeItem` するため、再表示後にユーザーが何もせずリロードしても案内は出たままになる（＝本当に「閉じていない状態」へ戻る）。再度閉じれば `dismiss()` が `'true'` を書き戻し、通常の記憶に戻る（REQ-2.20）。
-- フックは早期returnより前に置く（フックの規則）。既存の `useState` / `useInstallPrompt` の並びに `useEffect` を足すだけで、呼び出し順は安定する。
-- すでに表示中（`dismissed === false`）にシグナルが増えても `setDismissed(false)` は同値であり、表示は変わらず二重表示も起きない（REQ-2.21）。
-- スタンドアロン起動時はメニュー項目自体を出さない（REQ-2.17）が、仮にシグナルが増えても `isStandalone()` の早期returnで非表示のまま。二重の安全策になっている。
-- 自動表示の条件（未インストール かつ ブラウザタブ起動）そのものには手を入れない（REQ-2.24）。
+prop は**任意**なので既存の呼び出し `<InstallGuide />` はそのままでも動く。`DISMISSED_KEY` は引き続き `InstallGuide.tsx` 内部に閉じ、キー名・保存先を変更しない（REQ-5.10。既存利用者の「閉じた」状態をリリースでリセットしない）。`setItem('false')` ではなく `removeItem` を使うのは、「未設定＝まだ閉じていない」という `readDismissed()` の判定（`=== 'true'`）と素直に噛み合うため。これにより再表示後にリロードしても案内は出たままになり（＝本当に「閉じていない状態」へ戻る）、再度閉じれば `dismiss()` が `'true'` を書き戻して通常の記憶に戻る（REQ-2.20）。
+
+フックは早期returnより前に置く（フックの規則。既存の `useState` / `useInstallPrompt` の並びに `useEffect` を足すだけで呼び出し順は安定する）。表示中にシグナルが増えても `setDismissed(false)` は同値のため二重表示は起きず（REQ-2.21）、スタンドアロン起動時は `isStandalone()` の早期returnで非表示のまま（メニュー項目自体も出ないため二重の安全策）。自動表示の条件（未インストール かつ ブラウザタブ起動）自体には手を入れない（REQ-2.24）。
 
 `src/views/DiveLogListView.tsx`:
 
@@ -359,11 +314,9 @@ Android で一度「インストール」ボタンを押すと `deferredPrompt` 
 
 ### 3-1. 現状（調査結果）
 
-- 型: `src/types/diveLog.ts` の `export type Weather = 'sunny' | 'cloudy' | 'rainy' | 'other'`。**自由テキストではない**。git履歴上も、初回コミットからこの直和型で導入されており、自由記述だった時期はない。
-- 入力: `DiveLogFormView` の `<select>`（`選択なし` / 晴れ / 曇り / 雨 / その他）。空文字選択時は `undefined` に変換して保存。
-- 表示: `DiveLogDetailView` にローカル定義された `const weatherLabel: Record<string, string>` で日本語化。`diveLog.weather ? weatherLabel[diveLog.weather] : '-'`。
-- **後方互換の論点**: 型上は4値だが、実体はIndexedDBに入った文字列であり、型検査は保存時に働かない。[Google Drive同期](../google-drive-sync/design.md)経由で別バージョンの端末から取り込んだログや、将来選択肢を増減した場合に、**4値以外のコード値を持つレコードが存在しうる**。現在の詳細画面はこのとき `weatherLabel[unknownCode]` が `undefined` となり、**`<dd>` が空欄になる**（「-」も出ない）。本仕様でここも直す（REQ-3.9）。
-- 器材の選択リストは `src/types/gearOptions.ts` に「型＋ラベル配列＋`gearLabel()`（未知値は `-`）」として集約済み（[dive-log-crud/design.md](../dive-log-crud/design.md)）。天候も同じ形に揃えるのが自然。
+型は `src/types/diveLog.ts` の `export type Weather = 'sunny' | 'cloudy' | 'rainy' | 'other'` で**自由テキストではない**（git履歴上も初回コミットからこの直和型で、自由記述だった時期はない）。入力は `DiveLogFormView` の `<select>`（`選択なし` / 晴れ / 曇り / 雨 / その他、空文字選択時は `undefined` に変換して保存）。表示は `DiveLogDetailView` にローカル定義された `const weatherLabel: Record<string, string>` で日本語化（`diveLog.weather ? weatherLabel[diveLog.weather] : '-'`）。
+
+**後方互換の論点**: 型上は4値だが実体はIndexedDBに入った文字列であり、型検査は保存時に働かない。[Google Drive同期](../google-drive-sync/design.md)経由で別バージョンの端末から取り込んだログや、将来選択肢を増減した場合に**4値以外のコード値を持つレコードが存在しうる**。現在の詳細画面はこのとき `weatherLabel[unknownCode]` が `undefined` となり、**`<dd>` が空欄になる**（「-」も出ない）。本仕様でここも直す（REQ-3.9）。器材の選択リストは `src/types/gearOptions.ts` に「型＋ラベル配列＋`gearLabel()`（未知値は `-`）」として集約済み（[dive-log-crud/design.md](../dive-log-crud/design.md)）であり、天候も同じ形に揃えるのが自然。
 
 ### 3-2. ラベルの集約（`src/types/weatherOptions.ts`、新規）
 
@@ -390,15 +343,11 @@ export function weatherLabel(value: string | undefined): string
 - `DiveLogDetailView` のローカル `weatherLabel` マップは削除し、この関数を使う。`currentLabel`（流れ）は今回は触らない（[未確定事項 5](./requirements.md#未確定事項確認したい点)）。
 - 実装時、[dive-log-crud/design.md](../dive-log-crud/design.md) の「ローカルの `weatherLabel` / `currentLabel` はそのまま残す」という記述を本仕様に合わせて更新すること（[ui-polish-level1](../ui-polish-level1/design.md) が `dive-log-list-item__main` の記述を更新したのと同じ扱い）。
 
-### 3-3. 実装方式の比較
+### 3-3. 実装方式
 
-| 方式 | キーボード | 支援技術 | 実装量 | 判定 |
-| --- | --- | --- | --- | --- |
-| **`fieldset` + `input[type=radio]`（視覚的に非表示）＋ `label` を装飾** | 矢印キー・Space がネイティブで効く | 「ラジオボタン、晴れ、5個中2番目」等を自動で読み上げ | 小（CSSが主） | **採用** |
-| `<div role="radiogroup">` + `<button role="radio">` | 自前でロービングtabindexと矢印キー処理が必要 | 属性を正しく揃えれば同等 | 中〜大 | 不採用 |
-| `<select>` のまま見た目だけ変更 | - | - | - | 不採用（選択肢が常時見えないため要件を満たさない） |
+`fieldset` + `input[type=radio]`（視覚的に非表示）＋ `label` 装飾を採用。矢印キー・Spaceがネイティブで効き、支援技術の読み上げ（「ラジオボタン、晴れ、5個中2番目」等）も自動で揃うため実装量が最小で済む。`<div role="radiogroup">` + `<button role="radio">` で自前実装する案は、ロービングtabindexと矢印キー処理を自前で書く必要があり不採用。`<select>` の見た目だけ変更する案は、選択肢が常時見えず要件を満たさないため不採用。
 
-`:has()` セレクタを使って選択状態・フォーカス状態を装飾する。既存 `src/App.css` に `label:has(input[type='checkbox'])` の先例があり、Tier 1 プラットフォーム（iOS 16.4+ / Android Chrome 最新）で利用可能（[mobile-compatibility のサポート表](../mobile-compatibility/requirements.md)）。
+`:has()` セレクタで選択状態・フォーカス状態を装飾する。既存 `src/App.css` に `label:has(input[type='checkbox'])` の先例があり、Tier 1 プラットフォーム（iOS 16.4+ / Android Chrome 最新）で利用可能（[mobile-compatibility のサポート表](../mobile-compatibility/requirements.md)）。
 
 ### 3-4. コンポーネント
 
@@ -441,10 +390,8 @@ interface WeatherSelectProps {
   <WeatherSelect value={draft.weather} onChange={(v) => updateField('weather', v)} />
   ```
   従来の `<label>天候 <select …></label>` を丸ごと置き換える。`updateField` / `DiveLogDraft` は変更しない。
-- **未知のコード値**（REQ-3.8）: `value` がどの選択肢とも一致しないため、`checked` はすべて `false` になり「どれも選択されていない」表示になる。`draft.weather` は書き換わらないので、ユーザーが明示的に選ばない限り保存時にも元の値が保持される（`updateDiveLog` は `draft` をそのまま渡す）。**警告表示や自動変換は行わない**（器材の未知コード値と同じ扱い。[dive-log-crud/design.md](../dive-log-crud/design.md)）。
-- **`name` 属性**: フォーム内に1つしか存在しないため固定文字列 `weather` でよい（同一フォーム内に複数の `WeatherSelect` は置かない）。
-- **送信の誘発なし**（REQ-3.12）: `input[type=radio]` は送信を起こさない。`<button>` を使わないため `type="button"` の考慮も不要。
-- 「選択なし」のアイコンは、丸に斜線（`NoneIcon`）または区切りのダッシュを想定。[未確定事項 4](./requirements.md#未確定事項確認したい点) で「選択なし」の見せ方ごと確定する。ラベル文言も、幅320pxで収まらない場合は「なし」への短縮を検討する。
+
+**未知のコード値**（REQ-3.8）: `value` がどの選択肢とも一致しないため `checked` はすべて `false` になり「どれも選択されていない」表示になる。`draft.weather` は書き換わらず、保存時も元の値が保持される（`updateDiveLog` は `draft` をそのまま渡す）。**警告表示や自動変換は行わない**（器材の未知コード値と同じ扱い。[dive-log-crud/design.md](../dive-log-crud/design.md)）。`name` 属性はフォーム内に1つしかないため固定文字列 `weather` でよい。`input[type=radio]` は送信を誘発しない（REQ-3.12）。「選択なし」のアイコンは丸に斜線（`NoneIcon`）または区切りのダッシュを想定し、[未確定事項 4](./requirements.md#未確定事項確認したい点) で確定する。ラベル文言も幅320pxで収まらない場合は「なし」への短縮を検討する。
 
 ### 3-5. CSS
 
@@ -543,9 +490,7 @@ interface WeatherSelectProps {
 | `WeatherOtherIcon` | 天候: その他 | 候補: 雲＋太陽の組み合わせ／疑問符／横並びの点3つ（→ [未確定事項 6](./requirements.md#未確定事項確認したい点)） |
 | `NoneIcon` | 天候: 選択なし | `<circle cx="12" cy="12" r="8" />` ＋ `M8.5 15.5l7-7`（丸に斜線） |
 
-- 光線の多い `SunIcon` は 0.72rem 相当の小さい表示だと潰れるため、`weather-select__icon` は 1.25rem で表示する。詳細画面には出さないので小サイズ表示の心配はない。
-- 追加は6〜7個で、バンドル増は合計1KB未満の見込み（[ui-polish-level1](../ui-polish-level1/design.md) の試算と同じオーダー）。
-- アイコンが増えて `icons.tsx` が読みにくくなった場合の分割は将来の検討事項（[ui-polish-level1](../ui-polish-level1/design.md) の方針どおり、今はフラットな単一ファイルを維持）。
+`SunIcon` は光線が多く小サイズ表示だと潰れるため `weather-select__icon` は1.25remで表示する（詳細画面には出さないため小サイズ表示の心配はない）。追加6〜7個でバンドル増は1KB未満の見込み（[ui-polish-level1](../ui-polish-level1/design.md) と同オーダー）。`icons.tsx` の分割は将来の検討事項とし、今はフラットな単一ファイルを維持する（[ui-polish-level1](../ui-polish-level1/design.md) の方針どおり）。
 
 ---
 
@@ -586,7 +531,7 @@ interface WeatherSelectProps {
 
 ## 既知のトレードオフ・将来への布石
 
-- **メニュー項目は「設定」「ホーム画面に追加の案内」の2つ**（スタンドアロン起動時は「設定」のみ）。[未確定事項 8](./requirements.md#未確定事項確認したい点) の確定によりメニューを設ける動機が1項目だけではなくなったため、案A（ハンバーガー＋ドロップダウン）の妥当性は上がった。ただしスタンドアロン起動のユーザーにとっては依然として項目1つのメニューであり、設定に到達するのにワンタップ増える（これを避けたい場合は案B＝歯車アイコンのみ。[未確定事項 1](./requirements.md#未確定事項確認したい点)）。
+- **メニュー項目は「設定」「ホーム画面に追加の案内」の2つ**（スタンドアロン起動時は「設定」のみ）。スタンドアロン起動のユーザーには項目1つのメニューとなり、設定への到達にワンタップ増える点はトレードオフとして残る（[未確定事項 1](./requirements.md#未確定事項確認したい点), [未確定事項 8](./requirements.md#未確定事項確認したい点)）。
 - **インストール案内の再表示は「記憶の一時的な取り消し」**であり、記憶の仕組み自体のオン/オフ設定は設けない（REQ-2.20）。「今後表示しない」を明示的に切り替えたいという要望が出た場合は、設定画面側の項目として別途検討する。
 - **ブラウザの戻る操作でメニューを閉じられない**。自前ルーターはアプリ内部の遷移履歴スタックを持つが（[marine-life-observation/design.md](../marine-life-observation/design.md) 10節）、ブラウザの履歴API（`history.pushState` / `popstate`）とは連動しないため（[dive-log-crud/design.md](../dive-log-crud/design.md) の既知のトレードオフ）、Android の戻る操作はメニューを閉じずにアプリ／タブを離れる。ブラウザ履歴との統合を行う場合は本仕様とは別に「画面遷移とURL」の仕様が必要。
 - **FABは一覧画面専用**。詳細画面の「編集」や、フォームの「保存」をFAB化するかは今回判断しない（保存ボタンはフォーム末尾のほうが入力完了との対応が分かりやすいため、現状維持を推奨）。

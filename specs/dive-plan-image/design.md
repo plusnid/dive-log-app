@@ -2,13 +2,13 @@
 
 関連: [要件](./requirements.md) / [概要](../00-overview.md) / [ダイビングログCRUD設計](../dive-log-crud/design.md) / [写真の添付設計](../photo-attachment/design.md) / [写真の拡大表示設計](../photo-lightbox/design.md) / [観察した生物の設計](../marine-life-observation/design.md) / [ガイドサイン設計](../guide-signature/design.md) / [Google Drive同期設計](../google-drive-sync/design.md) / [モバイル対応設計](../mobile-compatibility/design.md) / [UI仕上げ レベル1設計](../ui-polish-level1/design.md) / [UI仕上げ レベル2設計](../ui-polish-level2/design.md)
 
-ステータス: 仕様確定・実装待ち（[要件の確定事項](./requirements.md#未確定事項確認したい点) 1〜8 はすべてユーザー確定済み、2026-08-10）。
+ステータス: 実装済み。要件の確定事項（[requirements.md](./requirements.md#未確定事項確認したい点)）1〜8はすべて確定済み。
 
 本設計は、次の確定内容に基づく。
 
 | # | 確定内容 |
 | --- | --- |
-| 1 | データの持ち方は案B（`Attachment.uuid` による参照）。ただし確定事項2により**参照は配列**（`DiveLog.planImageUuids?: string[]`） |
+| 1 | データの持ち方は `Attachment.uuid` による参照。参照は配列（`DiveLog.planImageUuids?: string[]`） |
 | 2 | **複数枚を許容し、上限を設けない**。並びは追加順（並び替え操作なし） |
 | 3 | 専用部品 `PlanImagePicker`（複数選択・個別の取り除きに対応。`PhotoPicker` は変更しない） |
 | 4 | 任意項目 |
@@ -20,11 +20,11 @@
 ## 設計方針
 
 - **添付の実体は既存の `attachments` テーブルをそのまま使う**。新しいテーブル・新しい Dexie バージョンは作らない（[dive-log-crud/design.md](../dive-log-crud/design.md) / [marine-life-observation/design.md 4](../marine-life-observation/design.md) と同じ「非キー項目の追加だけで済ませる」判断。REQ-9.3）。
-- **同期エンジン（`src/sync/`）を変更しない**。[marine-life-observation](../marine-life-observation/design.md) が観察記録の持ち方を決めたときと同じ判断基準を採り、Drive上のファイル形式と `schemaVersion` を据え置く（→ [1](#1-データの持ち方), [7](#7-google-drive-同期への影響)）。
+- **同期エンジン（`src/sync/`）を変更しない**。Drive上のファイル形式と `schemaVersion` を据え置く（→ [1](#1-データの持ち方), [7](#7-google-drive-同期への影響)）。
 - **拡大表示は既存部品をそのまま使う**。`ImageLightbox` は集合の枚数に応じて前後ナビゲーションと位置表示を自動的に出し分ける（[photo-lightbox/design.md 2](../photo-lightbox/design.md)）ため、複数枚になっても部品側は無変更（REQ-4.8）。
 - **入力部品は親が状態を持つコントロールドコンポーネント**とする（`PhotoPicker` / `SignaturePad` / `ObservationEditor` と同じ方針）。DB操作はリポジトリ層に閉じる（REQ-9.4）。
 - **「写真」と「プラン画像」の区別は表示側で担保する**。データ上は同じ `attachments` に載るが、ユーザーから見て混ざらないようにする（REQ-1.5, REQ-3.6, REQ-7.3）。
-- **複数枚の管理は写真（`PhotoPicker` ＋ `newPhotoFiles` / `removedPhotoIds`）と同じ形にそろえる**。プラン画像専用の三値（変更なし／取り除き／差し替え）の約束は作らない。同じ形にすることで、リポジトリ層の保存フロー・サニタイズを写真と対称に書ける。
+- **複数枚の管理は写真（`PhotoPicker` ＋ `newPhotoFiles` / `removedPhotoIds`）と同じ形にそろえる**。同じ形にすることで、リポジトリ層の保存フロー・サニタイズを写真と対称に書ける。
 - **依存パッケージは追加しない**（REQ-9.1）。
 
 ## 変更対象ファイル
@@ -50,7 +50,7 @@
 
 1. **添付は1テーブル・型で区別**: `attachments` は `++id, type, &uuid`（version 2）で、`Attachment.type` は `'photo' | 'signature'` の2値。`DiveLog` は `photoIds: number[]` と `signatureId?: number` で添付を参照する（`src/types/diveLog.ts`）。
 
-2. **観察記録は `Attachment.uuid` の配列で写真を参照する**: `Observation.photoUuids: string[]`。ローカル採番の `id` は同期先で振り直されるため使えない、という理由で選ばれた方式（[marine-life-observation/design.md 2](../marine-life-observation/design.md)）。参照先の実体は `DiveLog.photoIds` にも含まれているため、同期時に必ず一緒に運ばれる。**本仕様のプラン画像はこの方式をそのまま流用する**（参照が配列である点まで同じ）。
+2. **観察記録は `Attachment.uuid` の配列で写真を参照する**: `Observation.photoUuids: string[]`。ローカル採番の `id` は同期先で振り直されるため使えない（[marine-life-observation/design.md 2](../marine-life-observation/design.md)）。参照先の実体は `DiveLog.photoIds` にも含まれるため、同期時に必ず一緒に運ばれる。**本仕様のプラン画像はこの方式をそのまま流用する**（参照が配列である点まで同じ）。
 
 3. **同期エンジンは添付を明示列挙している**（本仕様にとって最重要）。`src/sync/syncEngine.ts`:
 
@@ -64,7 +64,7 @@
    ```
 
    `RemoteLogFile` は `photoUuids: string[]` と `signatureUuid: string | null` という**固定のフィールド**で添付を運ぶ（`src/sync/syncTypes.ts`）。取り込み側 `syncRepository.applyRemoteLog()` もこの2フィールドだけを見て `upsertAttachmentByUuid()` を呼ぶ。
-   → **`photoIds` / `signatureId` のどちらにも属さない新しい添付を作ると、その実体は Drive にアップロードもダウンロードもされない。** これが確定事項1で案Bを選んだ決め手である。
+   → **`photoIds` / `signatureId` のどちらにも属さない新しい添付を作ると、その実体は Drive にアップロードもダウンロードもされない。** これが「専用の添付type」を採らず既存 `photoIds` に同居させる決め手である（→ [1](#1-データの持ち方)）。
 
 4. **ログ本体の項目は rest スプレッドで自動的に運ばれる**: `toRemoteLogBody()` は `id` / `uuid` / `photoIds` / `signatureId` / `createdAt` / `updatedAt` を除いた残余をそのまま `log` に書き出し、`applyRemoteLog()` は `{ ...remoteLog }` で書き戻す。`RemoteLogBody = Omit<DiveLog, 'id'|'uuid'|'photoIds'|'signatureId'|'createdAt'|'updatedAt'>` のため、**`DiveLog` に足した非キー項目は型の上でも実行時にも自動的に同期対象になる**（配列でも同様）。
 
@@ -84,19 +84,7 @@
 
 ## 1. データの持ち方
 
-**確定＝案B（写真と同居し、ログ側から `Attachment.uuid` の配列で指す）。**
-
-| 観点 | 案A: 専用の添付（`planImageIds?: number[]` ＋ `type: 'plan'`） | **案B（確定）: 写真と同居し `planImageUuids?: string[]` で指す** |
-| --- | --- | --- |
-| データモデルの明快さ | ◎ 「プラン画像は写真ではない」ことが型に出る | △ 実体は `photoIds` にも含まれ、`planImageUuids` が「そのうちのどれがプラン画像か」を示す間接的な構造 |
-| Dexie スキーマ | 変更不要 | 変更不要（非キー項目） |
-| カスケード削除（REQ-6.3） | `deleteDiveLog()` と `syncRepository.deleteLogByUuid()` の両方に追加が必要 | **無変更**（`photoIds` に含まれるため既存の削除経路で消える） |
-| 同期エンジン（`src/sync/`） | **変更必須**（[0-3](#0-現状コードで確認した事実)） | **無変更**（実体は `photoUuids` で運ばれ、参照は `log` の rest スプレッドで運ばれる） |
-| 旧版端末との混在（REQ-8.4） | ✗ プラン画像が静かに失われうる | ◎ 値も実体も保持される（廃止項目 `gear` と同じ仕組み） |
-| 写真枚数・一覧サムネイル | ◎ 自然に区別される | △ 表示側で除外が必要（→ [8](#8-一覧カードへの表示)） |
-| 観察記録の写真候補（REQ-7.3） | ◎ 自動的に候補外 | △ リポジトリ層で `allowedUuids` から除外する（→ [6](#6-リポジトリ層srcdbdivelogrepositoryts)） |
-
-複数枚化（確定事項2）によっても、この比較の結論は変わらない。案Bで単数を配列にする追加コストは「`string` を `string[]` に読み替える」だけであり、観察記録（`photoUuids: string[]`）で実績のある形と完全に同じになる。
+**専用の添付type（`planImageIds?: number[]` ＋ `type: 'plan'`）ではなく、写真と同居し `planImageUuids?: string[]` でuuid参照する方式を採用。** 決め手は [0-3](#0-現状コードで確認した事実): 同期エンジンは添付を `photoIds` / `signatureId` からしか列挙しないため、専用typeにすると実体がDriveに同期されない。同居方式なら Dexie スキーマ・カスケード削除・同期エンジンのいずれも無変更で済み、旧版端末との混在時も値・実体ともに保持される（廃止項目 `gear` と同じ仕組み。REQ-8.4）。トレードオフとして、写真枚数の表示やサムネイル選定・観察記録の写真候補では表示/リポジトリ層での除外が必要になる（→ [8](#8-一覧カードへの表示), [6-3](#6-3-getdivelogdetail)）。単数でなく配列にする追加コストは「`string` を `string[]` に読み替える」だけで、観察記録（`photoUuids: string[]`）で実績のある形と完全に同じになる。
 
 ### データモデル
 
@@ -122,7 +110,7 @@ export type DiveLogDraft = Omit<
 >
 ```
 
-`planImageUuids` を `DiveLogDraft` から `Omit` する理由は `observations` と同じである。フォームはまだ保存されていない画像（`File`）と保存済みの添付ID（`number`）しか持てず、`Attachment.uuid` へ解決できるのは添付を保存したリポジトリ層だけであるため、**プラン画像はリポジトリ関数の独立した引数として渡す**（→ [6](#6-リポジトリ層srcdbdivelogrepositoryts)）。副次的な効果として、本機能を持たない版のアプリが `update()` するときも `planImageUuids` キーが渡らず、既存値が保持される（REQ-8.4）。
+`planImageUuids` を `DiveLogDraft` から `Omit` する理由は `observations` と同じ。フォームはまだ保存されていない画像（`File`）と保存済みの添付ID（`number`）しか持てず、`Attachment.uuid` へ解決できるのは添付を保存したリポジトリ層だけであるため、**プラン画像はリポジトリ関数の独立した引数として渡す**（→ [6](#6-リポジトリ層srcdbdivelogrepositoryts)）。副次的な効果として、本機能を持たない版のアプリが `update()` するときも `planImageUuids` キーが渡らず、既存値が保持される（REQ-8.4）。
 
 `RemoteLogBody`（`src/sync/syncTypes.ts`）は `Omit<DiveLog, 'id'|'uuid'|'photoIds'|'signatureId'|'createdAt'|'updatedAt'>` であり `planImageUuids` を含むため、**型定義の変更も不要**である。
 
@@ -132,38 +120,19 @@ export type DiveLogDraft = Omit<
 
 ## 2. 枚数
 
-**確定＝複数枚を許容し、上限を設けない（REQ-1.3）。** 理由はブリーフィング図が複数ページに分かれる場合への対応。当初の推奨案（1枚固定）は不採用。
-
-複数枚化が本設計に与えた影響を1箇所にまとめる（各節の詳細への索引）。
-
-| 箇所 | 1枚固定案での想定 | **複数枚（確定）での設計** | 節 |
-| --- | --- | --- | --- |
-| 型 | `planImageUuid?: string` | `planImageUuids?: string[]`（順序＝表示順） | [1](#1-データの持ち方) |
-| 入力部品 | 「選び直す＝差し替え」の1枚UI | `PhotoPicker` と同形の複数枚UI（追加・個別の取り除き・2系統の管理） | [3](#3-入力uiplanimagepicker) |
-| リポジトリの引数 | `planImage?: File \| null`（三値） | `newPlanImageFiles: File[]` ＋ `removedPlanImageIds: number[]`（写真と対称） | [6](#6-リポジトリ層srcdbdivelogrepositoryts) |
-| 詳細画面 | 1枚を横幅いっぱいで表示 | 同じ見せ方を**縦積み**で枚数分（1列） | [5-1](#5-1-複数枚のレイアウト) |
-| 拡大表示 | 集合1件・前後ナビなし | 集合＝全プラン画像。2枚以上なら前後ナビと位置表示が自動的に有効 | [5-3](#5-3-divelogdetailview-の変更) |
-| 一覧カードの写真枚数 | `-1` するだけ | `- planImageUuids.length`（下限0でクランプ） | [8](#8-一覧カードへの表示) |
-| 同期の競合コピー | uuid 1つの写像 | 配列の `flatMap` による写像（観察記録と同じ形） | [7](#7-google-drive-同期への影響) |
+**複数枚を許容し、上限を設けない（REQ-1.3）。** 理由はブリーフィング図が複数ページに分かれる場合への対応。
 
 **並び順**（REQ-1.4）: 「保存済み（保存順）→ 当該編集で追加した分（選択順）」。並び替えUIは設けない（対象外）。ページ順を変えたい場合は、いったん取り除いてから希望の順に選び直す運用になる（→ [既知の制約](#既知の制約トレードオフ)）。
 
-**上限を設けない**理由: 写真（[photo-attachment REQ-1](../photo-attachment/requirements.md)）と同じ扱いにそろえ、枚数制限のエラー表示・文言・検証という新しい概念を持ち込まないため。容量に関する既存の防御（保存失敗時のエラー表示、REQ-6.6）はそのまま適用される。
+**上限を設けない理由**: 写真（[photo-attachment REQ-1](../photo-attachment/requirements.md)）と同じ扱いにそろえ、枚数制限のエラー表示・文言・検証という新しい概念を持ち込まないため。容量に関する既存の防御（保存失敗時のエラー表示、REQ-6.6）はそのまま適用される。
+
+複数枚であることは型（`planImageUuids: string[]`）・入力部品（`PhotoPicker` と同形の複数管理）・リポジトリの引数（`newPlanImageFiles: File[]` ＋ `removedPlanImageIds: number[]`、写真と対称）・詳細画面（縦積み表示）・拡大表示（集合＝全プラン画像）・一覧カードの写真枚数計算（`- planImageUuids.length`）・同期の競合コピー（配列の `flatMap` による写像）のすべてに一貫して反映されている（各節を参照）。
 
 ---
 
 ## 3. 入力UI（`PlanImagePicker`）
 
-**確定＝プラン画像専用の新規部品を作る（`PhotoPicker` は変更しない。REQ-2.12）。**
-
-複数枚になったことで `PhotoPicker` との機能差は小さくなったが、次の理由で専用部品を維持する。
-
-| 観点 | **案ア: 専用部品 `PlanImagePicker`（確定）** | 案イ: `PhotoPicker` に「用途」props を足して流用 |
-| --- | --- | --- |
-| 既存機能への回帰リスク | なし（写真添付という中核機能に触れない） | あり（props と分岐が増える） |
-| プレビューの見せ方 | 図の全体が見える `contain` の縦並びにできる | 96×96の `cover`（正方形の切り取り）で、ルート図は判別できない |
-| ラベル・代替テキスト | 「ダイビングプランの画像」に固定できる | props で切り替える分岐が増える |
-| 実装量 | 小（`PhotoPicker` の構造をほぼそのまま写す。約100行） | 小だが既存ファイルの改変を伴う |
+**プラン画像専用の新規部品を作る（`PhotoPicker` は変更しない。REQ-2.12）。** `PhotoPicker` に用途propsを足して流用する案は、写真添付という中核機能への回帰リスクを持ち込むうえ、プレビューを図の全体が見える `contain` の縦並びにしたい（`PhotoPicker` は96×96の `cover` で正方形に切り取る）という表示要件とも合わないため採らなかった。実装量は `PhotoPicker` の構造をほぼそのまま写す程度（約100行）で収まる。
 
 ### API
 
@@ -205,14 +174,12 @@ interface PlanImagePickerProps {
 
 ## 4. 配置
 
-**確定＝案ア（基本情報の区画の末尾）。独立したセクションは設けない。**
+**基本情報の区画の末尾。独立したセクションは設けない。**
 
 - **フォーム**: 基本情報 `<fieldset>` の末尾（潜水時間の直後）に `<label>ダイビングプラン画像</label>` として `PlanImagePicker` を置く。`.dive-log-form fieldset` は `flex-direction: column; gap: .6rem` のため、追加のレイアウト調整は不要。
 - **詳細画面**: 基本情報 `<section>` の `<dl>`（エリア・最大水深・潜水時間）の**直後**に置く。[0-10](#0-現状コードで確認した事実) のとおり `dl` は2列グリッドであり、大きな画像を `<dd>` に入れると横幅が `1fr` 側に制限されるうえ、行の高さが不揃いになる。`dl` の外に出し、小さなラベル＋画像の縦積みにする。
 
-順序: 日付・時刻（`<h1>` と副題）→ エリア・最大水深・潜水時間 → **ダイビングプラン画像** → 環境情報。フォーム・詳細画面のどちらも「基本情報の最後」で一致させる。
-
-複数枚になったことで詳細画面の基本情報セクションは縦に伸びるが、環境情報以降のセクションはスクロールで到達できる位置にあり、順序を変える必要はない（→ [既知の制約](#既知の制約トレードオフ)）。
+順序: 日付・時刻（`<h1>` と副題）→ エリア・最大水深・潜水時間 → **ダイビングプラン画像** → 環境情報。フォーム・詳細画面のどちらも「基本情報の最後」で一致させる。複数枚で詳細画面の基本情報セクションが縦に伸びても、環境情報以降はスクロールで到達できるため順序は変えない（→ [既知の制約](#既知の制約トレードオフ)）。
 
 ---
 
@@ -220,18 +187,7 @@ interface PlanImagePickerProps {
 
 ### 5-1. 複数枚のレイアウト
 
-1枚あたりの見せ方は確定済み（横幅いっぱい・最大高さ240px・`object-fit: contain`）。複数枚の並べ方を以下で比較する。
-
-| 観点 | **案ア: 縦積み（1列）＝確定** | 案イ: 横スクロールのストリップ | 案ウ: 2列グリッド |
-| --- | --- | --- | --- |
-| 全枚数の存在の分かりやすさ（REQ-3.4） | ◎ すべてが同じ幅で並び、スクロールで必ず目に入る | △ 2枚目以降が画面外にあり、横スクロールできることに気づかない場合がある | ○ 並んで見える |
-| 図の可読性 | ◎ 1枚あたりの幅が最大 | ○ 幅を狭める必要がある（1枚あたり80%幅など） | △ 幅が半分になり、細い文字は判別しにくい |
-| 横スクロール（REQ-3.7） | ◎ 発生しない | △ 内部スクロールコンテナを作るため、ページ横スクロールとの区別・慣性の扱いに注意が要る | ◎ 発生しない |
-| 実装量 | 最小（`flex-direction: column` と `gap` のみ） | 中（スクロールスナップ・端の見切れ表現） | 小 |
-| 縦の長さ | 枚数×最大240px（＋余白）と最も長い | 240px固定 | 枚数の半分×240px |
-| 既存パターンとの整合 | 新規（ただし `.detail-photos` の折り返しと矛盾しない） | アプリ内に横スクロール領域の前例がない | `.detail-photos` に近い |
-
-**案アを確定とする。** プラン図は「全体を読む」ための画像であり、幅を犠牲にする案ウ・存在が隠れる案イはいずれも本機能の目的に反する。プラン画像は通常1〜3枚程度と想定され、縦の長さの増加は許容範囲である。実運用で枚数が多くなり縦に長すぎると感じた場合は、2枚目以降の最大高さを下げる／折りたたむ、といった調整を別途検討する（→ [既知の制約](#既知の制約トレードオフ)）。
+1枚あたりの見せ方は横幅いっぱい・最大高さ240px・`object-fit: contain`。複数枚は**縦積み（1列）**を採用する。横スクロールのストリップは2枚目以降が画面外に隠れて存在に気づきにくく、2列グリッドは1枚あたりの幅が半分になり細い文字が判別しにくい。プラン図は「全体を読む」ための画像であり、幅を犠牲にする案・存在が隠れる案はいずれも目的に反する。プラン画像は通常1〜3枚程度と想定され、縦の長さの増加（`flex-direction: column` のみで実装可能）は許容範囲である。実運用で縦に長すぎる場合は、2枚目以降の最大高さを下げる／折りたたむ等を別途検討する（→ [既知の制約](#既知の制約トレードオフ)）。
 
 ### 5-2. ラベルと代替テキスト
 
@@ -344,7 +300,7 @@ export interface DiveLogDetail {
 }
 ```
 
-**三値（`undefined` / `null` / 値）の約束を採らない理由**: 複数枚になったことで、プラン画像の変更は「差し替え」ではなく写真と同じ「追加・削除の集合管理」になった。写真の `newPhotoFiles` / `removedPhotoIds` と同形にすることで、フォーム側の状態・保存フロー・サニタイズをすべて写真と対称に書ける。両方が省略（または空配列）のとき、結果として `planImageUuids` は既存値の正規化（実体のない参照の除去）のみが行われる（REQ-6.5）。
+プラン画像の変更は「差し替え」の三値（`undefined`/`null`/値）ではなく、写真と同じ「追加・削除の集合管理」（`newPlanImageFiles` / `removedPlanImageIds`）にした。これにより、フォーム側の状態・保存フロー・サニタイズをすべて写真と対称に書ける。両方が省略（または空配列）のとき、結果として `planImageUuids` は既存値の正規化（実体のない参照の除去）のみが行われる（REQ-6.5）。
 
 ### 6-2. 保存フロー
 
@@ -404,8 +360,6 @@ const allowedUuids = new Set(addedPhotos.map((p) => p.uuid))
    })
    ```
 
-   配列を常に書くため、1枚固定案で懸念していた「`undefined` を渡したときの Dexie のプロパティ削除の挙動」に依存しない。
-
 **`deleteDiveLog`**: **変更不要**。プラン画像の添付IDは `photoIds` に含まれるため、既存のカスケード削除と墓標記録でそのまま処理される（REQ-6.3, REQ-6.4）。
 
 ### 6-3. `getDiveLogDetail`
@@ -456,7 +410,7 @@ const [newPlanImageFiles, setNewPlanImageFiles] = useState<File[]>([])
 
 ## 7. Google Drive 同期への影響
 
-**同期エンジン（`src/sync/`）とDrive上のファイル形式は無変更である（確定事項 7）。** 参照が配列になっても、この結論は変わらない。
+**同期エンジン（`src/sync/`）とDrive上のファイル形式は無変更である（確定事項 7）。**
 
 ### 変更が不要な理由
 
@@ -521,9 +475,9 @@ await db.diveLogs.add({
 
 ## 8. 一覧カードへの表示
 
-**確定＝一覧カードに新しい表示は追加しない（REQ-5.1）。** [ui-polish-level1](../ui-polish-level1/design.md) の「情報の強弱を付ける」方針からも、一覧に出す価値の低い情報は増やさない。アイコン（`PlanIcon`）の追加も不要。
+**一覧カードに新しい表示は追加しない（REQ-5.1）。** [ui-polish-level1](../ui-polish-level1/design.md) の「情報の強弱を付ける」方針からも、一覧に出す価値の低い情報は増やさない。アイコン（`PlanIcon`）の追加も不要。
 
-**ただし、案B（`photoIds` 同居）の帰結として、次の2点の手当ては必須である。**
+**ただし、写真と同じ `photoIds` に同居させた帰結として、次の2点の手当ては必須である。**
 
 1. **写真枚数（REQ-5.2）**: `DiveLogListItem` は `diveLog.photoIds.length` をそのまま「写真 n枚」として出しているため、プラン画像の枚数分だけ多くなる。`DiveLog` だけで判定できる派生値に置き換える。
 
@@ -612,7 +566,7 @@ await db.diveLogs.add({
 - **本機能を持たない旧バージョンの端末では、プラン画像が「写真」として枚数分表示される**（[7](#7-google-drive-同期への影響)）。データは失われないが、その端末で写真として削除されると当該参照が解決できなくなる（残りのプラン画像は表示され、次回保存時に参照が整理される）。
 - **プラン画像の並び替えができない**（REQ-1.4）。並びは「保存済み → 追加順」に固定であり、ページ順を入れ替えるにはいったん取り除いて選び直す必要がある。ページ番号やキャプションも保存しないため、順序が唯一の手がかりになる。
 - **枚数に上限がなく、複数枚添付すると詳細画面の基本情報セクションが縦に長くなる**（1枚あたり最大240px）。プラン画像が多いログでは環境情報以降へのスクロール量が増える。実運用で問題になる場合は、2枚目以降の高さを下げる／折りたたむ等を別要望として検討する。
-- **画像の圧縮・リサイズを行わない**（REQ-9.6、[photo-attachment/design.md](../photo-attachment/design.md) と同じ制約）。高解像度のプラン図を複数枚添付すると、1枚固定の場合よりも IndexedDB と Drive の容量を圧迫しやすい（保存失敗時は既存のエラー表示に従う＝REQ-6.6）。
+- **画像の圧縮・リサイズを行わない**（REQ-9.6、[photo-attachment/design.md](../photo-attachment/design.md) と同じ制約）。高解像度のプラン図を複数枚添付すると、IndexedDB と Drive の容量を圧迫しやすい（保存失敗時は既存のエラー表示に従う＝REQ-6.6）。
 - **PDFのプランには対応しない**。`accept="image/*"` のため、PDFで共有された場合はユーザーがスクリーンショット等で画像化する必要がある（複数ページのPDFは、ページごとに画像化して複数枚添付する運用になる）。対応するには表示側にPDFレンダリング（依存パッケージの追加）が必要になり、REQ-9.1 に反する。
 - **プラン画像に説明を付けられない**。代替テキストは「ダイビングプランの画像（n枚目 / 全N枚）」で固定であり、図の内容そのものを音声のみで把握することはできない（[photo-lightbox 7](../photo-lightbox/design.md) と同じ限界）。
 - **拡大表示のズーム・回転はできない**（[photo-lightbox](../photo-lightbox/design.md) の方針を維持）。細かい文字を読むにはOS/ブラウザのピンチズームに頼る。プラン図は写真より細部の可読性が要求されるため、実機確認の結果によっては [photo-lightbox 8](../photo-lightbox/design.md) の案B（実寸表示＋スクロール）を別要望として検討する余地がある。

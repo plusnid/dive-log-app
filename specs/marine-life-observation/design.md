@@ -3,7 +3,7 @@
 関連: [要件](./requirements.md) / [概要](../00-overview.md) / [ダイビングログCRUD設計](../dive-log-crud/design.md) / [写真の添付設計](../photo-attachment/design.md) / [Google Drive同期設計](../google-drive-sync/design.md) / [UI仕上げ レベル1設計](../ui-polish-level1/design.md) / [UI仕上げ レベル2設計](../ui-polish-level2/design.md) / [UI仕上げ レベル3設計](../ui-polish-level3/design.md)
 
 ステータス: 初回分（[1](#1-観察記録の持ち方)〜[8](#8-手動確認観点初回実装分)）は実装済み。
-**改善要望2件の設計（[9](#9-観察記録のリスト表示改善要望1) / [10](#10-画面遷移の履歴改善要望2)）は策定中で、[要件の未確定事項](./requirements.md#確定済み改善要望122026-08-09) 9〜18 のユーザー判断待ち。以下の 9・10 は推奨案に基づく設計であり、判断次第で差し替える。**
+**改善要望2件（[9](#9-観察記録のリスト表示改善要望1) / [10](#10-画面遷移の履歴改善要望2)）は策定中。[要件の未確定事項](./requirements.md#確定済み改善要望122026-08-09) 9〜18 のユーザー判断待ちで、判断次第で差し替わる。**
 
 ## 設計方針
 
@@ -52,20 +52,9 @@
 
 ## 1. 観察記録の持ち方
 
-### 方式の比較（[未確定事項 1](./requirements.md#未確定事項確認したい点)）
+### 決定（[未確定事項 1](./requirements.md#未確定事項確認したい点)）
 
-| 観点 | **案A: `DiveLog` 内に配列で持つ（推奨）** | 案B: `observations` テーブルを新設 |
-| --- | --- | --- |
-| Dexieスキーマ | 変更不要（`stores()` に現れない非キー項目。`area` や器材項目と同じ扱い） | version 3 が必要（`observations: '++id, &uuid, diveLogId, genre, name'`） |
-| ログ削除時 | 自動（ログのレコードごと消える） | `deleteDiveLog` にカスケード削除の実装が必要 |
-| 保存の原子性 | ログの `add` / `update` 1回で完結 | ログと観察記録の複数テーブル書き込みをトランザクションで束ねる必要がある |
-| 同期（[google-drive-sync](../google-drive-sync/design.md)） | `logs/<uuid>.json` の `log` に自然に含まれる。エンジン変更・`schemaVersion` 変更なし | 新しい `SyncKind`・墓標・Drive上のファイル配置・競合解決の粒度の再設計が必要 |
-| 競合解決 | ログ単位のまま（[REQ-6](../google-drive-sync/requirements.md)）。観察記録だけが競合することはない | 観察記録単位の競合が新たに発生し、ログとの整合（親が消えた子）も考慮が必要 |
-| 検索（名前・ジャンル） | 全ログ走査（`db.diveLogs.toArray()` の在メモリ集計） | `where('name')` 等のインデックス検索が可能 |
-| 件数が増えたとき | ログ1件のレコードが大きくなる（観察記録1件は数十バイト。1本20種でも1KB未満） | スケールする |
-| 一覧購読との相性 | `useDiveLogs()` の結果に観察記録が含まれるため、追加のクエリなしで一覧カードの件数表示・検索画面の集計ができる | 一覧・検索のたびに別テーブルを結合する必要がある |
-
-**案Aを推奨する。** 決め手は同期である。[google-drive-sync/design.md](../google-drive-sync/design.md) は「ログ1件＝Drive上の1ファイル」「競合解決はレコード（ログ）単位」を前提に設計されており、観察記録を独立したレコードにすると、同期対象の種別追加・墓標・親子整合の設計をやり直すことになる。一方、案Aなら**同期エンジンは1行も変えずに**観察記録が端末間で運ばれる（[7](#7-google-drive-同期への影響)）。
+観察記録は `DiveLog` 内に配列で持つ方式（案A）を採用。**決め手は同期。** [google-drive-sync/design.md](../google-drive-sync/design.md) は「ログ1件＝Drive上の1ファイル」「競合解決はレコード（ログ）単位」を前提としており、観察記録を独立テーブル（案B）にすると新しい `SyncKind`・墓標・親子整合の再設計が必要になる。配列方式なら Dexie スキーマ変更・カスケード削除の実装・トランザクション設計・**同期エンジンの変更のいずれも不要**（[7](#7-google-drive-同期への影響)）。代償は検索が全ログ走査になること（インデックス検索は使えない）。
 
 検索性能の懸念に対しては、ログ件数が個人利用の規模（数百〜数千件）であり、既存の `listPastPlaceValues()` が既に全件走査を行っている（[dive-log-crud/design.md](../dive-log-crud/design.md)）ことから、初回リリースではインデックスなしで十分と判断する。将来必要になった場合の移行パスは [4](#4-dexie-スキーマとマイグレーション) に記す。
 
@@ -146,13 +135,7 @@ export function marineLifeGenreLabel(value: string | undefined): string
 
 ## 2. 写真参照の持ち方
 
-観察記録が写真を指す方法には3案ある。
-
-| 方式 | 同期後の有効性 | 写真削除時 | 競合コピー時 | 判定 |
-| --- | --- | --- | --- | --- |
-| ローカルの `Attachment.id`（`DiveLog.photoIds` と同じ数値） | **無効**。id は端末ごとの採番で、`applyRemoteLog` は取り込み先で採番し直す | 参照が残る（要掃除） | 参照が壊れる | 不採用 |
-| `DiveLog.photoIds` 内の**位置（index）** | 有効（`photoUuids` の順序で復元されるため） | **全参照のずれ直しが必要** | 有効 | 不採用（削除のたびに全観察記録を書き換える必要があり壊れやすい） |
-| **`Attachment.uuid`（採用）** | **有効**（`uuid` は端末間で不変。`applyRemoteLog` は uuid で突き合わせて upsert する） | 参照を落とすだけ（順序に影響しない） | 付け替えが必要（[7](#7-google-drive-同期への影響)） | **採用** |
+観察記録の写真参照は **`Attachment.uuid`** を採用（ローカルの `Attachment.id`、および `DiveLog.photoIds` 内の位置＝indexは不採用）。理由: `id` は端末ごとの採番であり、`applyRemoteLog` は取り込み先で採番し直すため同期後は無効になる。位置（index）で持つ方式は同期後も有効だが、写真削除のたびに全観察記録の参照をずらし直す実装が必要で壊れやすい。`uuid` は端末間で不変で、`applyRemoteLog` が uuid で突き合わせて upsert するため同期後も有効なまま解決でき、写真削除時も参照を落とすだけで済む（順序に影響しない）。代償は競合コピー時に uuid の付け替えが必要になること（[7](#7-google-drive-同期への影響)）。
 
 `Attachment` は [google-drive-sync](../google-drive-sync/design.md) の version 2 で既に `uuid`（`&uuid` インデックス付き）を持っているため、追加のスキーマ変更なしにこの参照方式を採れる。
 
@@ -183,13 +166,13 @@ export interface ObservationDraft {
 
 ### 3-1. 配置
 
-`DiveLogFormView` の `<fieldset>` として「観察した生物」を**器材・エア管理と写真・メモの間**に追加する……のではなく、**写真・メモの直後**に置く。理由は、写真の紐付け（REQ-3.1）を行うには先に写真が選ばれている必要があり、フォーム上の並びが「写真を追加 → 生物に紐づける」という操作順と一致するため。
+`DiveLogFormView` の `<fieldset>`「観察した生物」は**写真・メモの直後**に置く（器材・エア管理の直後ではない）。写真の紐付け（REQ-3.1）には先に写真が選ばれている必要があり、「写真を追加 → 生物に紐づける」という操作順と一致させるため。
 
 ```
 [基本情報] [環境情報] [器材・エア管理] [写真・メモ] [観察した生物] [ガイドのサイン]
 ```
 
-詳細画面のセクション順（[3-4](#3-4-詳細画面)）とは一致しなくなるが、詳細画面は閲覧順（生物 → 写真の順に見せたい）を優先する。順序に希望があれば [未確定事項 8](./requirements.md#未確定事項確認したい点) で確定する。
+詳細画面のセクション順（[3-4](#3-4-詳細画面)）とは一致しなくなるが、詳細画面は閲覧順（生物 → 写真）を優先する。順序に希望があれば [未確定事項 8](./requirements.md#未確定事項確認したい点) で確定する。
 
 ### 3-2. `ObservationEditor`（新規）
 
@@ -210,7 +193,7 @@ interface AvailablePhoto {
 ```
 
 - 親（`DiveLogFormView`）が状態を持つコントロールドコンポーネント。DB操作は行わない（`PhotoPicker` / `SignaturePad` と同じ方針）。
-- `availablePhotos` は、`existingPhotos`（`removedExistingIds` を除外したもの）と `newFiles` から親が組み立て、`URL.createObjectURL` の生成と `URL.revokeObjectURL` の解放を `useEffect` のクリーンアップで行う（[photo-attachment/design.md](../photo-attachment/design.md) と同じ扱い）。`PhotoPicker` が内部で作るオブジェクトURLとは別インスタンスになるが、オブジェクトURLは Blob の実体を複製しない軽量なハンドルであり、メモリ上の写真データが二重に載ることはない。
+- `availablePhotos` は `existingPhotos`（`removedExistingIds` を除外）＋ `newFiles` から親が組み立て、`URL.createObjectURL` の生成／解放を `useEffect` クリーンアップで行う（[photo-attachment/design.md](../photo-attachment/design.md) と同じ扱い）。`PhotoPicker` 内部のオブジェクトURLとは別インスタンスだが、オブジェクトURLは軽量なハンドルなのでメモリの二重化は起きない。
 - 1行の構成:
 
 ```
@@ -244,7 +227,7 @@ interface AvailablePhoto {
     })),
   )
   ```
-- 新規行の `uuid` は `newUuid()`（`src/db/uuid.ts`）で採番する。ビュー → `db/` の依存方向は既存の依存の向き（[概要](../00-overview.md)）に沿う。
+- 新規行の `uuid` は `newUuid()`（`src/db/uuid.ts`）で採番する（ビュー → `db/` は既存の依存方向、[概要](../00-overview.md)）。
 - **写真が取り除かれたときの参照整理（REQ-3.6）**: 既存写真の削除（`onRemoveExisting`）と新規写真の削除（`onNewFilesChange`）を親のハンドラでラップし、観察記録側の `photos` から該当参照を除去する。
   ```ts
   function handleRemoveExisting(pid: number) {
@@ -296,10 +279,10 @@ interface AvailablePhoto {
 </section>
 ```
 
-- 写真は `getDiveLogDetail` が返す `photos: Attachment[]` を `uuid` で引き当て、既に生成済みの `photoUrls` を再利用する（`URL.createObjectURL` を増やさない）。現状 `photoUrls` は配列の位置で `photos` と対応しているため、`uuid → url` の `Map`（`photoUrlByUuid`）を組み立てて使う。参照先が見つからない（`undefined`）場合はサムネイルを出さない（REQ-3.7 と同じ扱い）。
-- **1行の構成は名前 → ジャンル → サムネイルの順**（`display: flex; align-items: center`）。2枚以上紐づいていても表示は先頭1枚のみで、残りの枚数は表示しない（REQ-4.4。[10. 観察記録のリスト表示](#10-観察記録のリスト表示と行の編集改善要望1)のフォーム側の一覧行と表示方針を揃えた。当初案の「名前・ジャンルの見出し行＋写真の全枚数を並べた行」の2段構成から、実装後のユーザーフィードバックにより1行構成へ改めた）。
-- ジャンルは名前より弱い書式（`--text-muted`・小さめ）とし、名前を主とする（[ui-polish-level1](../ui-polish-level1/design.md) の情報の強弱の方針）。
-- 名前を選択すると検索画面の該当ログ一覧へ移動する導線（[未確定事項 5](./requirements.md#未確定事項確認したい点)で確定・採用）を入れる。`DiveLogDetailView` に `onSelectCreature?: (name: string) => void` を追加し、`App.tsx` が `{ view: 'creatures', name }` へ遷移する。
+- 写真は `getDiveLogDetail` が返す `photos: Attachment[]` を `uuid` で引き当て、既に生成済みの `photoUrls`（配列位置対応）から `uuid → url` の `Map`（`photoUrlByUuid`）を組み立てて再利用する（`URL.createObjectURL` を増やさない）。参照先が見つからない場合はサムネイルを出さない（REQ-3.7 と同じ扱い）。
+- 1行の構成は名前 → ジャンル → サムネイルの順（`display: flex; align-items: center`）。2枚以上紐づいていても先頭1枚のみ表示（REQ-4.4）。フォーム側の一覧行（[9](#9-観察記録のリスト表示改善要望1)）と表示方針を揃えた。当初の2段構成（見出し行＋全枚数）から、実装後のユーザーフィードバックにより1行構成へ改めた。
+- ジャンルは名前より弱い書式（`--text-muted`・小さめ）で名前を主とする（[ui-polish-level1](../ui-polish-level1/design.md) の情報の強弱の方針）。
+- 名前を選択すると検索画面の該当ログ一覧へ移動する導線（[未確定事項 5](./requirements.md#未確定事項確認したい点)で確定・採用）。`DiveLogDetailView` に `onSelectCreature?: (name: string) => void` を追加し、`App.tsx` が `{ view: 'creatures', name }` へ遷移する。
 
 ### 3-5. 一覧カード
 
@@ -355,7 +338,7 @@ export interface UpdateDiveLogOptions {
 }
 ```
 
-- `observations` を省略可能にすることで、既存の呼び出し箇所（およびテスト・将来の別画面からの保存）を壊さない。`updateDiveLog` で `undefined` のときは `db.diveLogs.update()` に `observations` キーを含めず、Dexie の「渡されたキーのみ変更する」性質により既存値を保持する（廃止項目 `gear` と同じ扱い、[dive-log-crud/design.md](../dive-log-crud/design.md)）。
+- 省略可能にすることで既存の呼び出し箇所を壊さない。`updateDiveLog` で `undefined` のときは `db.diveLogs.update()` に `observations` キーを含めず、Dexieの「渡されたキーのみ変更する」性質で既存値を保持する（廃止項目 `gear` と同じ扱い、[dive-log-crud/design.md](../dive-log-crud/design.md)）。
 
 ### 写真参照の解決とサニタイズ
 
@@ -388,8 +371,8 @@ function resolveObservations(
 export async function listPastObservationValues(): Promise<{ genre?: MarineLifeGenre; name: string }[]>
 ```
 
-- 実装は `listPastPlaceValues()` と同じ形。`db.diveLogs.toArray()` を1回実行し、`date` 降順 → `updatedAt` 降順に並べたうえで、各ログの `observations` を順に展開して返す。重複排除・ジャンルでの絞り込みはUI側の純関数（`deriveCreatureNameCandidates`）で行う。これは `derivePlaceCandidates` と同じ役割分担であり、行ごとに選択中のジャンルが変わっても再クエリせずに候補を出し分けられる（[未確定事項 3](./requirements.md#未確定事項確認したい点) の補助案）。
-- フォームでの取得タイミングは既存の初期ロード（`useEffect` で1回）に合わせる。`useLiveQuery` は使わない（[dive-log-crud/design.md](../dive-log-crud/design.md) のフック層の方針）。
+- 実装は `listPastPlaceValues()` と同じ形。`db.diveLogs.toArray()` を1回実行し `date`→`updatedAt` 降順に並べ、各ログの `observations` を展開して返す。重複排除・ジャンル絞り込みはUI側の純関数 `deriveCreatureNameCandidates`（`derivePlaceCandidates` と同じ役割分担）で行い、行ごとの選択中ジャンルが変わっても再クエリ不要にする（[未確定事項 3](./requirements.md#未確定事項確認したい点) の補助案）。
+- 取得タイミングは既存の初期ロード（`useEffect` で1回）に合わせる。`useLiveQuery` は使わない（[dive-log-crud/design.md](../dive-log-crud/design.md) のフック層の方針）。
 
 ---
 
@@ -448,12 +431,12 @@ export function filterCreatures(
 ): CreatureEntry[]
 ```
 
-- `useDiveLogs()` は `orderBy('date').reverse()` で既に日付降順のため、走査順のまま `logIds` に積めば REQ-6.9 の順序になる（同一日付内の順序は Dexie のインデックス順に従う。一覧画面と同じ順序になり、画面間で矛盾しない）。
-- 同一ログ内に同じ名前の観察記録が複数あっても、`logIds` には1回だけ積む（件数はログ数、REQ-6.3）。
-- 一覧の並び順は**最近観察した順**（先頭のログが新しい順）とする。[dive-log-crud REQ-8.5](../dive-log-crud/requirements.md) の参照候補と同じ考え方で、「最近見た生物ほど探したい」という想定に合う。件数順・五十音順にする場合はこの関数の最後に `sort` を足すだけで切り替えられる。
-- 検索語は `query.trim()` が空文字なら絞り込まない（REQ-6.3）。部分一致は `name.includes(trimmed)` の単純判定とし、大文字小文字・全角半角・カタカナひらがなの正規化は行わない（[dive-log-crud REQ-8.4](../dive-log-crud/requirements.md) と同じ方針。表記ゆれの吸収は将来の課題）。
-- 該当ログ一覧は `logs.filter((l) => selected.logIds.includes(l.id))` で得た `DiveLog[]` を `DiveLogListItem` に渡す（REQ-6.9, REQ-6.10）。`DiveLogListItem` の props は変更しない。
-- 空状態: 観察記録が1件もない（`entries.length === 0` かつ検索語なし）ときは「まだ生物の記録がありません。」（REQ-6.12）、絞り込み結果が0件のときは「該当する生物が見つかりませんでした。」（REQ-6.11）。
+- `useDiveLogs()` は既に日付降順のため、走査順のまま `logIds` に積めば REQ-6.9 の順序になり、一覧画面と矛盾しない。
+- 同一ログ内の同名観察記録は `logIds` に1回だけ積む（件数はログ数、REQ-6.3）。
+- 並び順は**最近観察した順**（[dive-log-crud REQ-8.5](../dive-log-crud/requirements.md) の参照候補と同じ考え方）。件数順・五十音順にする場合は関数末尾に `sort` を足すだけで切り替え可。
+- 検索語は `query.trim()` が空文字なら絞り込まない（REQ-6.3）。部分一致は `name.includes(trimmed)` の単純判定で、正規化・表記ゆれの吸収は行わない（[dive-log-crud REQ-8.4](../dive-log-crud/requirements.md) と同じ方針）。
+- 該当ログ一覧は `logs.filter((l) => selected.logIds.includes(l.id))` を `DiveLogListItem`（props変更なし）に渡す（REQ-6.9, REQ-6.10）。
+- 空状態: 観察記録0件は「まだ生物の記録がありません。」（REQ-6.12）、絞り込み0件は「該当する生物が見つかりませんでした。」（REQ-6.11）。
 
 ### 6-3. 検索の計算量
 
@@ -465,11 +448,10 @@ export function filterCreatures(
 
 ### 変更が不要な部分
 
-- `sync/syncEngine.ts` の `toRemoteLogBody()` は、`id` / `uuid` / `photoIds` / `signatureId` / `createdAt` / `updatedAt` を除いた残余（rest スプレッド）を `logs/<uuid>.json` の `log` にそのまま書き出す。したがって **`observations` は個別対応なしに同期対象へ含まれる**（REQ-8.1）。
-- 取り込み側の `syncRepository.applyRemoteLog()` も `{ ...remoteLog, uuid, photoIds, signatureId, … }` の形でログを組み立てるため、`observations` はそのまま書き戻される。
-- 観察記録の写真参照は `Attachment.uuid` であり、`applyRemoteLog` は添付を **uuid で突き合わせて upsert** するため、取り込み先の端末でも参照が有効なまま解決できる（REQ-8.2）。ログJSONの `photoUuids` に含まれる添付は必ず先にダウンロード・登録される（[google-drive-sync/design.md](../google-drive-sync/design.md) の「トランザクション境界」）ので、参照先が欠けることはない。
+- `sync/syncEngine.ts` の `toRemoteLogBody()` は `id`/`uuid`/`photoIds`/`signatureId`/`createdAt`/`updatedAt` を除いた残余（rest スプレッド）を `logs/<uuid>.json` の `log` にそのまま書き出すため、**`observations` は個別対応なしに同期対象へ含まれる**（REQ-8.1）。取り込み側の `applyRemoteLog()` も `{ ...remoteLog, … }` の形でログを組み立てるため、そのまま書き戻される。
+- 観察記録の写真参照は `Attachment.uuid` であり、`applyRemoteLog` は添付を**uuidで突き合わせてupsert**するため取り込み先でも参照が有効なまま解決できる（REQ-8.2）。ログJSONの `photoUuids` に含まれる添付は必ず先にダウンロード・登録される（[google-drive-sync/design.md](../google-drive-sync/design.md) の「トランザクション境界」）ので参照先が欠けることはない。
 - 競合解決はログ単位のまま（REQ-8.3）。観察記録だけが競合することはなく、[google-drive-sync](../google-drive-sync/design.md) の決定表は無変更。
-- `schemaVersion` は **1 のまま**（REQ-8.7）。`log` の中身は `DiveLogDraft` 相当の自由な項目集合であり、項目の増減で同期の互換性は変わらない（[google-drive-sync/design.md](../google-drive-sync/design.md) が明記している設計）。
+- `schemaVersion` は**1のまま**（REQ-8.7）。`log` の中身は `DiveLogDraft` 相当の自由な項目集合であり、項目の増減で同期の互換性は変わらない（[google-drive-sync/design.md](../google-drive-sync/design.md) の設計）。
 
 `logs/<uuid>.json` の `log` は次のようになる（追加部分のみ抜粋）:
 
@@ -486,12 +468,12 @@ export function filterCreatures(
 ### 変更が必要な部分
 
 1. **競合コピーでの写真参照の付け替え（REQ-8.4）** — `src/db/syncRepository.ts` の `createConflictCopy()`。
-   現状は敗者側の写真 Blob を**新しい uuid の添付として複製**してから `{ ...source.log }` でログを作る。このままだと、複製されたログの `observations[].photoUuids` は**複製元**の添付 uuid を指したままとなり、参照が解決できなくなる（表示上は REQ-3.7 により写真なしとして無視されるが、写真との対応が失われる）。
-   対応: 複製時に `旧uuid → 新uuid` の `Map` を作り、`observations` の `photoUuids` を写像する。あわせて観察記録の `uuid` も採番し直す（同一内容の観察記録が2つのログに同じ識別子で存在しないようにする）。10行程度の追加で済み、`sync/` 側（React にも Dexie にも依存しないレイヤー）には手を入れない。
+   現状は敗者側の写真Blobを**新しいuuidの添付として複製**してから `{ ...source.log }` でログを作るため、複製後の `observations[].photoUuids` は**複製元**のuuidを指したままとなり参照が解決できなくなる（REQ-3.7により表示上は無視されるが、写真との対応が失われる）。
+   対応: 複製時に `旧uuid → 新uuid` の `Map` を作り `observations` の `photoUuids` を写像し、観察記録の `uuid` も採番し直す（同一識別子が2ログに存在しないように）。10行程度の追加で済み、`sync/` 側には手を入れない。
 
 2. **`RemoteLogBody` の型定義（REQ-8.6）** — `src/sync/syncTypes.ts`。
-   現状 `export type RemoteLogBody = DiveLogDraft` であり、`DiveLogDraft` から `observations` を `Omit` する（[1](#データモデルsrctypesdivelogts)）と**型の上では `observations` が消える**。実行時には rest スプレッドで運ばれるため動作は正しいが（廃止項目 `gear` と同じ構造）、新規項目でこの「型に出ない」状態を放置すると、将来 `toRemoteLogBody()` を明示的なフィールド列挙に書き換えた際にデータが失われる。
-   対応: 型定義を実態に合わせる（**型のみの変更で、実行時の挙動は一切変わらない**）。
+   現状 `RemoteLogBody = DiveLogDraft` であり、`DiveLogDraft` から `observations` を `Omit` する（[1](#データモデルsrctypesdivelogts)）と**型の上では `observations` が消える**。実行時はrestスプレッドで運ばれるため動作は正しいが（廃止項目 `gear` と同じ構造）、将来 `toRemoteLogBody()` を明示的フィールド列挙に書き換えた際にデータ欠落のリスクがある。
+   対応: 型定義を実態に合わせる（**型のみの変更で実行時の挙動は不変**）。
    ```ts
    /** Drive 上の `logs/<uuid>.json` の `log` フィールド。ローカル専用の id/uuid/photoIds/signatureId/日時は含まない。
     *  DiveLogDraft と異なり、フォームが直接編集しない項目（observations / 廃止済みの gear）も含む。 */
@@ -542,20 +524,11 @@ export function filterCreatures(
 
 現状の `ObservationEditor` は、観察記録1件ごとに「ジャンルの `<select>` ＋削除ボタン」「名前の `<input>` ＋ `PastValuePicker`」「写真のトグル選択グリッド」を**常に展開**して縦に並べる。1行あたり3段（写真がある場合は4段以上）の高さになり、5件も登録すると区画がフォームの大半を占める。本節は表示形式だけを変更し、入力できる項目・保存される値は変えない（REQ-10.23）。
 
-### 9-1. 展開方式の比較（改善要望1）
+### 9-1. 決定（改善要望1）
 
-| 観点 | **案A: インライン展開（アコーディオン、推奨）** | 案B: 被せパネル（`PastValuePicker` 風） | 案C: モーダル／ボトムシート |
-| --- | --- | --- | --- |
-| 既存パターンとの整合 | `AppMenu` の disclosure（`aria-expanded` + 展開領域）と同じ考え方。新しい概念を持ち込まない | `PastValuePicker` と同じ被せ方だが、同パネルが**行の内側にも**開くため入れ子のパネルになる | このアプリにオーバーレイ部品は存在しない（削除確認も `window.confirm`） |
-| 写真の選択グリッド | 画面幅をそのまま使える（56pxサムネイル×4〜5列、`flex-wrap`） | パネル幅に収まらず、パネル内スクロールが必要 | 十分な面積を取れる |
-| 実装量 | 小（現行のJSXを展開領域へ移し、開閉の state を足すだけ） | 中（位置決め・はみ出し対策） | 大（フォーカストラップ・背面スクロール抑止・Escape・safe-area・スクリム） |
-| アクセシビリティ | disclosure の標準的な実装で済む | 入れ子パネルのフォーカス制御が複雑 | `role="dialog"` + フォーカストラップの自前実装が必要でリスクが高い |
-| 依存追加 | なし | なし | なし（ただし自前実装の量が最大） |
-| スクロール位置 | 展開した行がその場で伸びるため、周辺の行との関係が保たれる | 背面の一覧が隠れる | 一覧を離れる |
+展開方式はインライン展開（アコーディオン）を採用（被せパネル・モーダル／ボトムシートは不採用）。理由: `AppMenu` の disclosure（`aria-expanded` + 展開領域）と同じ考え方で新しい概念を持ち込まずに済み、写真の選択グリッドに画面幅をそのまま使え、モーダルで必要になるフォーカストラップ・背面スクロール抑止・Escape・safe-area対応を自前実装せずに済む（本アプリはオーバーレイ部品を1つも持たない）。被せパネルは行の内側に入れ子で開くことになりフォーカス制御が複雑になるため不採用。
 
-**案Aを推奨する。** 決め手は写真の選択グリッドに必要な横幅と、フォーカストラップを自前実装しないで済むことである。案Cは1件の編集に集中できる利点があるが、本アプリはオーバーレイ部品を1つも持たないため、モーダルの一般的な要件（フォーカストラップ・背面の不活性化・Escape・iOSのビューポート対策）をここで初めて実装することになり、リスクとコストが要望に見合わない。
-
-ユーザー確定（2026-08-09）: 展開方式は案A（インライン展開）を採用。あわせて、一覧の各行に表示する情報は当初の推奨案（写真枚数のみ）ではなく、**紐づく最初の1枚のサムネイル**を表示する案を選択した（[未確定事項 10](./requirements.md#確定済み改善要望1218)）。行の高さは推奨案より増えるが、どの写真が紐づいているかを一覧上で視認できる利点を優先する。以降の 9-2〜9-5 はこの選択を反映済み。
+ユーザー確定（2026-08-09）: 上記の案Aを採用。あわせて、一覧の各行に表示する情報は当初案（写真枚数のみ）ではなく、**紐づく最初の1枚のサムネイル**を表示する案を選択した（[未確定事項 10](./requirements.md#確定済み改善要望1218)）。行の高さは増えるが、どの写真が紐づいているかを一覧上で視認できる利点を優先する。以降の 9-2〜9-5 はこの選択を反映済み。
 
 ### 9-2. マークアップ（案A）
 
@@ -608,13 +581,13 @@ function findThumbnail(photos: PhotoRef[], availablePhotos: AvailablePhoto[]): A
 <button type="button" className="observation-editor__add" onClick={addRow}>生物を追加</button>
 ```
 
-- **行全体を1つの `<button>` にする**。タップ領域が最大になり（REQ-10.21）、`aria-expanded` / `aria-controls` を1要素で完結できる。鉛筆アイコンは「押すと編集できる」ことの視覚的な手掛かりとして行内に置く（アイコン自体は `aria-hidden`。[ui-polish-level1](../ui-polish-level1/design.md) のアイコン方針）。
-- **[未確定事項 11](./requirements.md#確定済み改善要望122026-08-09) で案B（一覧行にも削除を置く）を採る場合は、この構造を変更する必要がある**。`<button>` の入れ子はHTMLとして不正なため、`observation-editor__summary` を `<div>` にし、その中に「展開用ボタン（`flex: 1`）」と「削除ボタン（44×44px）」を兄弟として並べる形になる。
-- `aria-controls` は折りたたみ時に存在しない要素を指すが、`AppMenu` も同じ書き方（`aria-controls="app-menu-panel"` を常時付与）であり、既存パターンに揃える。
-- ジャンル・名前・写真の入力UIは**現行のコードをそのまま移す**（REQ-10.9）。`deriveObservationNameCandidates()` の呼び出しが展開中の1行だけになるため、行数に比例していた候補計算が減るという副次的な改善もある。
-- 観察記録0件のときの案内文（「観察した生物を記録できます。」）と「生物を追加」ボタンは現状のまま。
-- **サムネイルは既存の `availablePhotos`（写真トグルグリッド用に親が生成済みのオブジェクトURL）をそのまま再利用する**。[ui-polish-level2](../ui-polish-level2/design.md) の `CardThumbnail` のような遅延読み込み・独自のオブジェクトURL生成は不要（このフォームのオブジェクトURLは、そのログの写真プール分だけ表示時に既に生成済みのため、追加のメモリコストは無い）。
-- 2枚以上紐づいている場合も表示は `observation.photos[0]`（配列の先頭＝最初に選択した写真）の1枚のみとし、残りの枚数は表示しない（REQ-10.3。[未確定事項 10](./requirements.md#確定済み改善要望1218)）。何枚紐づいているかを確認するには行を展開する。
+- **行全体を1つの `<button>` にする**（タップ領域最大化 REQ-10.21、`aria-expanded`/`aria-controls`を1要素で完結）。鉛筆アイコンは編集可能を示す視覚的手掛かり（`aria-hidden`、[ui-polish-level1](../ui-polish-level1/design.md)）。
+- [未確定事項 11](./requirements.md#確定済み改善要望122026-08-09) で案B（一覧行にも削除を置く）を採る場合は構造変更が必要（`<button>` の入れ子は不正なため `summary` を `<div>` にし、展開ボタンと削除ボタンを兄弟にする）。
+- `aria-controls` は折りたたみ時に存在しない要素を指すが、`AppMenu` と同じ書き方（常時付与）で既存パターンに揃える。
+- ジャンル・名前・写真の入力UIは**現行のコードをそのまま移す**（REQ-10.9）。`deriveObservationNameCandidates()` の呼び出しが展開中の1行だけになり、候補計算量も副次的に減る。
+- 観察記録0件のときの案内文・追加ボタンは現状のまま。
+- サムネイルは既存の `availablePhotos`（親が生成済みのオブジェクトURL）を再利用し、独自の遅延読み込みは実装しない（追加のメモリコストなし）。
+- 2枚以上紐づいていても表示は `observation.photos[0]` の1枚のみ（REQ-10.3、[未確定事項 10](./requirements.md#確定済み改善要望1218)）。枚数確認には行を展開する。
 
 ### 9-3. 状態とフォーカス管理
 
@@ -645,13 +618,12 @@ function removeRow(index: number) {                // REQ-10.16
 }
 ```
 
-- **展開状態は `ObservationEditor` の内部 state に閉じる**（親の `DiveLogFormView` へは持ち上げない）。保存対象でなく（REQ-10.15）、親が知る必要もないため。フォームを開き直せば全行が折りたたまれた状態になる。
-- **キーは index ではなく `uuid`**。親が `observations` を差し替えても（写真削除時の一括更新など、[3-3](#3-3-divelogformview-側の変更)）展開中の行がずれない。
-- 単一の `editingUuid` を持つことで REQ-10.10（同時展開は1件）が自然に満たされる。
-- 展開時のフォーカス先は**名前の入力欄**とする。`AppMenu` の「開いたらパネル内の先頭の操作要素へ移す」と同じ方針だが、この区画で最初に触りたいのは名前であるため、先頭要素（ジャンルの `<select>`）ではなく名前の `<input>` を選ぶ。
-- 折りたたみ時はフォーカスを行のトグルへ戻す（`AppMenu` の `close()` と同じ）。
-- **Escape キーによる折りたたみは実装しない**。展開領域の内部で `PastValuePicker` のパネルが開いている場合があり、Escape の意味が二重になる（`PastValuePicker` 自体は Escape に未対応）。折りたたみは「閉じる」ボタンと、他の行を開く操作で行う。→ [既知の制約](#既知の制約トレードオフ)。
-- `scrollIntoView` は呼ばない。フォーカス移動に伴うブラウザ既定のスクロールに任せ、意図しない画面の跳躍を避ける。
+- 展開状態は `ObservationEditor` の内部 state に閉じる（保存対象でなく、REQ-10.15、親へ持ち上げない）。フォームを開き直せば全行折りたたみ状態に戻る。
+- キーは index ではなく `uuid`（親が `observations` を差し替えても展開中の行がずれない、[3-3](#3-3-divelogformview-側の変更)）。
+- 単一の `editingUuid` により REQ-10.10（同時展開は1件）が自然に満たされる。
+- 展開時のフォーカス先は名前の入力欄（`AppMenu` の「開いたら先頭の操作要素へ」と同方針だが、最初に触りたいのは名前のため`<select>`ではなく`<input>`）。折りたたみ時は行のトグルへ戻す（`AppMenu.close()` と同じ）。
+- **Escapeキーによる折りたたみは実装しない**（展開領域内で `PastValuePicker` のパネルが開くことがあり意味が二重になるため。→ [既知の制約](#既知の制約トレードオフ)）。
+- `scrollIntoView` は呼ばない(意図しない画面の跳躍を避ける)。
 
 ### 9-4. スタイル（`ObservationEditor.css`）
 
@@ -696,32 +668,13 @@ function removeRow(index: number) {                // REQ-10.16
 
 ### 10-0. 現状（コードで確認した事実）
 
-`src/App.tsx` は `useState<Route>` の**単一の値**で現在の画面を保持し、履歴を持たない。各画面の戻り先はハードコードされている。
-
-| 画面 | コールバック | 現在の実装 | 問題 |
-| --- | --- | --- | --- |
-| `DiveLogDetailView` | `onBack` | `{ view: 'list' }` | 生物検索から来ても一覧へ戻る |
-| `DiveLogDetailView` | `onSelectCreature(name)` | `{ view: 'creatures', name }` | 戻り先を記憶していない |
-| `CreatureSearchView` | `onBack` | `{ view: 'list' }` | **直前の詳細画面へ戻れない（要望の発端）** |
-| `DiveLogFormView` | `onCancel` | `{ view: 'list' }` | 詳細から編集を開いても一覧へ戻る |
-| `SyncSettingsView` | `onBack` | `{ view: 'list' }` | （実害なし。設定は一覧からのみ開く） |
+`src/App.tsx` は `useState<Route>` の**単一の値**で現在の画面を保持し、履歴を持たない。各画面の戻り先（`onBack` / `onCancel`）はすべて `{ view: 'list' }` にハードコードされているため、`DiveLogDetailView` を生物検索から開いても一覧へ戻ってしまう（**直前の詳細画面へ戻れないことが本要望の発端**、`CreatureSearchView.onBack`）。同様に `DiveLogFormView.onCancel` も詳細経由の編集キャンセルで一覧へ戻ってしまう。
 
 さらに `CreatureSearchView` の2段階（生物一覧 ↔ 該当ログ一覧）は**コンポーネント内部の `useState<selectedName>`** だけで管理されており、`Route` には現れない（[6-1](#6-1-画面構成) の「`Route` を分割しない」方針）。そのため、該当ログ一覧 → 詳細 → 戻る のときに「生物一覧へ戻る」のか「該当ログ一覧へ戻る」のかを `App.tsx` が判別できない。
 
-### 10-1. 方式の比較（改善要望2）
+### 10-1. 決定（改善要望2）
 
-| 観点 | **案A: 汎用の履歴スタック（推奨）** | 案B: 生物名遷移だけ戻り先を記憶 | 案C: ルーティングライブラリの導入 |
-| --- | --- | --- | --- |
-| 変更量 | `App.tsx` に約40行、`CreatureSearchView` の props 変更 | `App.tsx` に数行（`Route` に `returnTo?: Route`） | 依存追加＋全画面の書き換え |
-| REQ-11.8（生物名 → 戻る） | ○ | ○ | ○ |
-| REQ-11.9（該当ログ一覧 → 詳細 → 戻る） | ○ | **×**（段階が `Route` にないため区別できず、別途 案A 相当の対応が要る） | ○ |
-| 保存・削除後の戻り先（REQ-11.10〜REQ-11.13） | 一元的に規定できる | 個別対応が必要 | 個別対応が必要 |
-| 他画面への波及 | 「詳細→編集→キャンセル」で詳細へ戻る等も同時に正しくなる | なし | 全画面 |
-| 型の複雑さ | `Route` は現状のまま。スタックは `Route[]` | `returnTo?: Route` が再帰型になり、2段以上の入れ子で破綻する | ライブラリの規約に従う |
-| 依存パッケージ | 追加なし | 追加なし | **追加あり（REQ-9.1 / REQ-11.23 に反する）** |
-| ブラウザの戻る対応 | 対象外（REQ-11.19） | 対象外 | 対応可能だが、GitHub Pages のサブパス配信・Service Worker のナビゲーション制御との兼ね合いを別途検討する必要がある |
-
-**案Aを推奨する。** 決め手は REQ-11.9 である。案Bは「詳細 → 生物名 → 該当ログ一覧 → 別のログの詳細 → 戻る」のような2段以上の遷移で戻り先を1つしか覚えられず、結局スタックが必要になる。案Cは依存追加のため不可（REQ-11.23）。
+汎用の履歴スタック（`Route[]`、案A）を採用。生物名遷移だけ戻り先を1件記憶する案（案B、`Route` に `returnTo?: Route` を持たせる）や、ルーティングライブラリ導入（案C）は不採用。**決め手はREQ-11.9**（該当ログ一覧 → 詳細 → 戻る）: 案Bは「詳細 → 生物名 → 該当ログ一覧 → 別のログの詳細 → 戻る」のような2段以上の遷移で戻り先を1つしか覚えられず、結局スタックが必要になる。案Cは依存パッケージの追加が必要でREQ-9.1 / REQ-11.23に反するため不可。スタック方式なら「詳細→編集→キャンセルで詳細へ戻る」等も`App.tsx`の変更だけで同時に正しくなる利点もある。ブラウザの戻る操作との連動は対象外（REQ-11.19）。
 
 ### 10-2. 履歴スタックの実装（`src/App.tsx`）
 
@@ -763,9 +716,9 @@ const dropLog = (id: number) =>
   })
 ```
 
-- `route` は `stack` の末尾から導出するだけなので、既存の `if (route.view === 'settings') return ...` という**画面の出し分け部分は1行も変わらない**。
-- 履歴に持つのは `Route`（画面種別＋識別子）だけで、ログの内容や入力中の値は持たない（REQ-11.5, REQ-11.24）。`App.tsx` は `view` ごとに別コンポーネントを `return` するため、戻ると対象の画面が**再マウント**され、`DiveLogDetailView` の `useEffect([id])` が `getDiveLogDetail(id)` を再実行する。したがって「古い内容の詳細画面に戻る」ことは起きない。一覧・検索は `useLiveQuery`（`useDiveLogs()`）で常に最新。
-- リロードで失われる（REQ-11.6）。`sessionStorage` への永続化は行わない（復元時に対象のログが存在しない可能性の処理が増え、利点が小さい）。
+- `route` は `stack` の末尾から導出するだけなので、既存の `if (route.view === 'settings') return ...` という画面の出し分け部分は1行も変わらない。
+- 履歴に持つのは `Route`（画面種別＋識別子）だけで、ログの内容や入力中の値は持たない（REQ-11.5, REQ-11.24）。`App.tsx` は `view` ごとに別コンポーネントを `return` するため、戻ると対象画面が**再マウント**され `useEffect([id])` が再実行される。「古い内容の詳細画面に戻る」ことは起きない（一覧・検索は `useLiveQuery` で常に最新）。
+- リロードで失われる（REQ-11.6）。`sessionStorage` への永続化は行わない（対象ログが存在しない場合の復元処理が増え、利点が小さい）。
 
 ### 10-3. 各遷移の対応表
 
@@ -805,20 +758,11 @@ if (route.view === 'detail') {
 
 ### 10-4. 保存・削除の扱い
 
-**保存（REQ-11.10, REQ-11.11）** — `onSaved` は `push` ではなく `replace` を使う。
+**保存（REQ-11.10, REQ-11.11）** — `onSaved` は `push` ではなく `replace` を使う。置き換え後の直下と同一なら畳まれる（`isSameRoute`）ため、新規作成では空フォームに戻らず、詳細からの編集では同じ詳細が2回積まれない（例: `[list, detail(12), form(12)]` → 保存 → 畳んで `[list, detail(12)]`）。
 
-- 新規作成: `[list, form]` → `replace({detail, 12})` → `[list, detail(12)]`。戻る → 一覧。**空の入力フォームには戻らない。**
-- 詳細からの編集: `[list, detail(12), form(12)]` → `replace({detail, 12})` → 置き換え後の直下が `detail(12)` と同一なので畳んで `[list, detail(12)]`。戻る → 一覧（＝編集を始める前に詳細を開いた画面）。**同じ詳細が2回積まれない。**
-- 生物検索経由: `[list, creatures(クマノミ), detail(34), form(34)]` → 保存 → `[list, creatures(クマノミ), detail(34)]` → 戻る → 該当ログ一覧。
+**フォームが履歴の途中に残らないことの保証**: フォーム画面への入口は `push`（新規・編集）だけ、出口は `onCancel`（`back`）か `onSaved`（`replace`）しかない。どちらもフォームのエントリを取り除くため、フォームは常にスタック末尾にしか存在せず、「戻る」でフォームに戻ることはない（`dropLog` が `form` も対象にしているのは防御的措置）。
 
-**フォームが履歴の途中に残らないことの保証**: フォーム画面への入口は `push`（新規・編集）だけであり、出口は `onCancel`（`back`）か `onSaved`（`replace`）しかない。どちらもフォームのエントリを取り除くため、フォームのエントリは常にスタックの末尾にしか存在しない。よって「戻る」でフォームに戻ることはない（`dropLog` が `form` も対象にしているのは防御的措置）。
-
-**削除（REQ-11.13, REQ-11.14）** — `dropLog(id)` は当該ログの `detail` / `form` エントリを**スタックの全位置から**取り除く。
-
-- `[list, detail(12), creatures(クマノミ), detail(12)]` で末尾の詳細から削除 → `[list, creatures(クマノミ)]` → 該当ログ一覧を表示。削除済みのログはカード一覧から消える（`useDiveLogs()` が再計算される）。
-- `[list, detail(12)]` で削除 → `[list]` → 一覧（現状と同じ挙動）。
-- `creatures` / `list` のエントリは残す（REQ-11.14）。表示時に最新データから再計算されるため、存在しないログを指したままにはならない。
-- なお `deleteDiveLog` 自体は変更しない（[dive-log-crud](../dive-log-crud/design.md)）。[dive-log-crud REQ-5.2](../dive-log-crud/requirements.md) の「一覧画面へ戻る」は REQ-11.13 により「削除前に見ていた画面へ戻る」に改まる（実装後に dive-log-crud 側の記述を更新する）。
+**削除（REQ-11.13, REQ-11.14）** — `dropLog(id)` は当該ログの `detail` / `form` エントリを**スタックの全位置から**取り除く（例: `[list, detail(12), creatures(クマノミ), detail(12)]` で削除 → `[list, creatures(クマノミ)]`）。`creatures` / `list` のエントリは残す（REQ-11.14。表示時に最新データから再計算されるため、存在しないログを指したままにはならない）。`deleteDiveLog` 自体は変更しない（[dive-log-crud](../dive-log-crud/design.md)）。[dive-log-crud REQ-5.2](../dive-log-crud/requirements.md) の「一覧画面へ戻る」は REQ-11.13 により「削除前に見ていた画面へ戻る」に改まる（実装後に dive-log-crud 側の記述を更新する）。
 
 ### 10-5. `CreatureSearchView` の controlled 化（[未確定事項 16・17](./requirements.md#確定済み改善要望122026-08-09)）
 
@@ -858,24 +802,22 @@ if (route.view === 'creatures') {
 }
 ```
 
-- `Route` の `creatures` に `query?: string` / `genre?: MarineLifeGenre` を足すのは [未確定事項 17](./requirements.md#確定済み改善要望122026-08-09) の案Aを採る場合のみ。案Bなら `query` / `genre` は `CreatureSearchView` の内部 state のままにする（詳細から戻ると検索語が初期化される）。
-- 検索語の変更は `replace` で扱う（`isSameRoute` が `query` / `genre` を見ないため、`push` にしても積まれないが、意図を明示するために `replace` を使う）。1文字ごとに `App` が再レンダリングされるが、集計は `useMemo` 済みで（[6-3](#6-3-検索の計算量)）実害はない。
-- 画面内の「← 生物一覧に戻る」ボタンは `onBack`（＝履歴の `back`）に統合する。履歴上、該当ログ一覧の直下は「生物一覧」（生物一覧から選んだ場合）または「ログの詳細」（生物名リンクから来た場合）であり、どちらもユーザーが直前に見ていた画面である。詳細から来た場合に生物一覧へ行けなくなるのを補うのが `onShowCreatureList`（REQ-11.17）。
-- 文言は [未確定事項 15](./requirements.md#確定済み改善要望122026-08-09)（推奨: 全画面で「← 戻る」に統一し、生物一覧への移動は別ボタン「生物一覧」とする）。
+- `Route` の `creatures` に `query?: string` / `genre?: MarineLifeGenre` を足すのは [未確定事項 17](./requirements.md#確定済み改善要望122026-08-09) の案Aを採る場合のみ。案Bなら内部 state のままにする（詳細から戻ると検索語が初期化される）。
+- 検索語の変更は `replace` で扱う（`isSameRoute` が `query`/`genre` を見ないため `push` でも積まれないが、意図を明示するため `replace` を使う）。1文字ごとに再レンダリングされるが集計は `useMemo` 済み（[6-3](#6-3-検索の計算量)）で実害なし。
+- 画面内の「← 生物一覧に戻る」ボタンは `onBack`（＝履歴の `back`）に統合する。詳細から来た場合に生物一覧へ行けなくなるのを補うのが `onShowCreatureList`（REQ-11.17）。
+- 文言は [未確定事項 15](./requirements.md#確定済み改善要望122026-08-09)（推奨: 全画面「← 戻る」に統一、生物一覧への移動は別ボタン「生物一覧」）。
 
-### 10-6. 遷移トレース（設計の検証）
+### 10-6. 遷移トレースの検証（抜粋）
 
-| # | 操作 | スタックの変化 | 期待どおりか |
+`push` / `replace` / `back` / `dropLog`（[10-2](#10-2-履歴スタックの実装srcapptsx)）を主要シナリオに適用し、想定どおり動くことを確認済み:
+
+| # | 操作 | スタックの変化 | 検証した要件 |
 | --- | --- | --- | --- |
-| 1 | 一覧 → FAB → 保存 | `[list]` → `[list, form]` → `[list, detail(12)]` → 戻る → `[list]` | ○ REQ-11.10 |
-| 2 | 一覧 → 詳細 → 編集 → 保存 → 戻る | `[list, detail(12)]` → `[…, form(12)]` → `[list, detail(12)]` → `[list]` | ○ REQ-11.11 |
-| 3 | 一覧 → 詳細 → 編集 → キャンセル | `[list, detail(12), form(12)]` → `[list, detail(12)]` | ○ REQ-11.12（現状は一覧へ戻ってしまう） |
-| 4 | **一覧 → 詳細 → 生物名 → 戻る** | `[list, detail(12)]` → `[…, creatures(クマノミ)]` → `[list, detail(12)]` | ○ **REQ-11.8（要望の主目的）** |
-| 5 | メニュー → 生物一覧 → 生物選択 → ログ選択 → 戻る → 戻る | `[list, creatures()]` → `[…, creatures(クマノミ)]` → `[…, detail(34)]` → `[…, creatures(クマノミ)]` → `[list, creatures()]` | ○ REQ-11.9, REQ-11.16 |
-| 6 | 詳細 → 生物名 → 別ログ詳細 → 編集 → 保存 → 戻る → 戻る | `[list, detail(12), creatures(クマノミ), detail(34), form(34)]` → 保存 → `[…, detail(34)]` → `[…, creatures(クマノミ)]` → `[list, detail(12)]` | ○ |
-| 7 | 詳細 → 生物名 → 該当ログ一覧 → そのログの詳細 → 削除 | `[list, detail(12), creatures(クマノミ), detail(12)]` → `dropLog(12)` → `[list, creatures(クマノミ)]` | ○ REQ-11.13（削除済みログの詳細が履歴に残らない） |
-| 8 | 詳細 → 生物名 → 「生物一覧」ボタン → 戻る | `[list, detail(12), creatures(クマノミ)]` → `[list, detail(12), creatures()]` → `[list, detail(12)]` | ○ REQ-11.17 |
-| 9 | 一覧 → 設定 → 戻る | `[list, settings]` → `[list]` | ○（現状と同じ結果） |
+| 4 | **一覧 → 詳細 → 生物名 → 戻る**（要望の主目的） | `[list, detail(12)]` → `[…, creatures(クマノミ)]` → `[list, detail(12)]` | REQ-11.8 |
+| 5 | メニュー → 生物一覧 → 生物選択 → ログ選択 → 戻る → 戻る | `[list, creatures()]` → `[…, creatures(クマノミ)]` → `[…, detail(34)]` → `[…, creatures(クマノミ)]` → `[list, creatures()]` | REQ-11.9, REQ-11.16 |
+| 7 | 詳細 → 生物名 → 該当ログ一覧 → そのログの詳細 → 削除 | `[list, detail(12), creatures(クマノミ), detail(12)]` → `dropLog(12)` → `[list, creatures(クマノミ)]` | REQ-11.13（削除済みログの詳細が履歴に残らない） |
+
+その他の遷移（FAB保存・編集キャンセル・「生物一覧」ボタン・設定など）も同じ4関数のロジックから直接導かれ、個別の分岐は不要。手動確認は [10-7](#10-7-手動確認観点改善要望2) で網羅する。
 
 ### 10-7. 手動確認観点（改善要望2）
 
@@ -907,31 +849,31 @@ if (route.view === 'creatures') {
 
 ## 既知の制約・トレードオフ
 
-- **観察記録に直接インデックスを張れない**（案Aの帰結）。検索は全ログの在メモリ走査であり、ログ件数が数万件規模になると初回集計が重くなる。移行パスは [4](#4-dexie-スキーマとマイグレーション) に記載。
-- **表記ゆれは吸収しない**。「クマノミ」「くまのみ」「Amphiprion」は別の生物として集計される。過去値の参照（REQ-2.6）で同じ表記を選びやすくすることで発生を減らすだけであり、既存の表記ゆれの名寄せ・一括リネームは提供しない（[dive-log-crud](../dive-log-crud/design.md) のエリア名・ポイント名と同じ割り切り）。
-- **ジャンルのプリセットを後から変更・削除すると、旧コード値を持つ既存レコードが「未知の値」になる**（`marineLifeGenreLabel()` が `-` にフォールバックし、編集フォームでは「選択なし」に見える）。器材の選択リストと同じ制約であり、選択肢の削除は慎重に行う。
-- **観察記録の写真参照は、ログの写真プールに閉じている**。ログをまたいで同じ写真を共有することはできない（そもそも添付がログ従属のため）。
-- **旧バージョンの端末が写真を削除すると、解決できない写真参照が残る**（[7](#7-google-drive-同期への影響) の表）。表示は壊れないが、参照の残骸は次にそのログを本バージョンで編集・保存したときにサニタイズされる。
-- **観察記録には日時・個体数・サイズなどを持たせない**。将来これらを足す場合、`Observation` に任意項目を追加するだけで済む（同期・スキーマへの影響は本機能と同じくゼロ）。
-- **`Observation.uuid` は現時点では必須ではない**（同一ログ内の識別だけなら配列の位置で足りる）。それでも持たせるのは、フォームの React key の安定化、競合コピー時の識別子の作り直し、そして将来 `observations` テーブルへ移行する場合に既存データへ識別子を後付けせずに済むため。不要と判断する場合は削っても他の設計は変わらない。
-- **一覧カードには件数しか出さない**（REQ-5.4）。「何を見たか」を一覧で知るには詳細画面か検索画面を開く必要がある。カードの情報量を増やしすぎない [ui-polish-level1](../ui-polish-level1/design.md) の方針を優先した判断。
+- **観察記録に直接インデックスを張れない**（案Aの帰結）。検索は全ログの在メモリ走査で、数万件規模だと初回集計が重くなる。移行パスは [4](#4-dexie-スキーマとマイグレーション)。
+- **表記ゆれは吸収しない**。「クマノミ」「くまのみ」「Amphiprion」は別の生物として集計される。過去値の参照（REQ-2.6）で発生を減らすのみで、名寄せ・一括リネームは提供しない（[dive-log-crud](../dive-log-crud/design.md) のエリア名・ポイント名と同じ割り切り）。
+- **ジャンルのプリセットを後から変更・削除すると、旧コード値を持つ既存レコードが「未知の値」になる**（`marineLifeGenreLabel()` が `-` にフォールバック）。器材の選択リストと同じ制約。
+- **観察記録の写真参照はログの写真プールに閉じている**。ログをまたいだ写真共有はできない（添付がログ従属のため）。
+- **旧バージョンの端末が写真を削除すると解決できない写真参照が残る**（[7](#7-google-drive-同期への影響) の表）。表示は壊れないが、参照の残骸は次にそのログを本バージョンで編集・保存したときにサニタイズされる。
+- **観察記録には日時・個体数・サイズなどを持たせない**。将来足す場合は `Observation` に任意項目を追加するだけで済む（同期・スキーマへの影響ゼロ）。
+- **`Observation.uuid` は必須ではない**（同一ログ内の識別だけなら配列位置で足りる）が、React keyの安定化・競合コピー時の識別子作り直し・将来のテーブル移行への備えとして持たせる。不要と判断すれば削っても他の設計は変わらない。
+- **一覧カードには件数しか出さない**（REQ-5.4）。詳細を知るには詳細画面か検索画面を開く必要がある（[ui-polish-level1](../ui-polish-level1/design.md) のカード情報量方針を優先）。
 
 ### 改善要望1（リスト表示）の制約
 
-- **1件の編集に2タップかかる**（開く → 入力）。常時展開に比べて、複数件を続けて入力するときのタップ数は増える。件数が少ないうちは現状のほうが速い、というトレードオフを受け入れる判断（[未確定事項 12](./requirements.md#確定済み改善要望122026-08-09) の自動展開でこれを緩和する）。
-- **Escape キーで行を折りたためない**（[9-3](#9-3-状態とフォーカス管理)）。展開領域の中で `PastValuePicker` のパネルが開くことがあり、Escape の意味が二重になるため実装しない。`AppMenu` は Escape に対応しているため、アプリ内で挙動が揃わない点は既知の不整合。
-- **展開状態は保存されない**（REQ-10.15）。フォームを離れて戻ると全行が折りたたまれる。
-- **並び替えは提供しない**（REQ-1.5）。リスト表示になったことでドラッグ並び替えの要望が出やすくなるが、本仕様では扱わない。
-- **一覧行では削除できない**（[未確定事項 11](./requirements.md#確定済み改善要望122026-08-09) の推奨案を採る場合）。誤って追加した行を消すには一度開く必要がある。
-- **名前が未入力の行は保存時に黙って消える**（REQ-1.3）。注意文（REQ-10.5）で予告するのみで、保存時の確認ダイアログは出さない。
+- **1件の編集に2タップかかる**（開く→入力）。件数が少ないうちは常時展開のほうが速いというトレードオフを受け入れる（[未確定事項 12](./requirements.md#確定済み改善要望122026-08-09) の自動展開で緩和）。
+- **Escapeキーで行を折りたためない**（[9-3](#9-3-状態とフォーカス管理)。`PastValuePicker` のパネルとEscapeの意味が二重になるため未実装）。`AppMenu` はEscape対応のため挙動不一致は既知の不整合。
+- **展開状態は保存されない**（REQ-10.15）。フォームを離れて戻ると全行折りたたみ。
+- **並び替えは提供しない**（REQ-1.5）。
+- **一覧行では削除できない**（[未確定事項 11](./requirements.md#確定済み改善要望122026-08-09) の推奨案採用時）。行を消すには一度開く必要がある。
+- **名前が未入力の行は保存時に黙って消える**（REQ-1.3）。注意文（REQ-10.5）のみで確認ダイアログは出さない。
 
 ### 改善要望2（履歴）の制約
 
-- **ブラウザ／OSの戻る操作には引き続き対応しない**（REQ-11.19）。本節が導入するのはアプリ内部の状態遷移スタックであり、`history.pushState` / `popstate` とは連動しない。Androidの戻るボタンやiOSのスワイプバックは、従来どおりアプリ／タブを離れる。履歴APIへの統合を行う場合は、URL設計・GitHub Pages のサブパス配信・Service Worker のナビゲーション制御・PWA 起動時の初期URLまで含めた別仕様が必要になる（[dive-log-crud/design.md](../dive-log-crud/design.md) / [ui-polish-level3/design.md](../ui-polish-level3/design.md) の既知のトレードオフを、本仕様の実装後もそのまま維持する）。
-- **リロード・アプリ再起動で履歴は失われる**（REQ-11.6）。永続化しない。
-- **スクロール位置は復元しない**。戻った画面は先頭から表示される（現状と同じ）。長い一覧から詳細へ入って戻ると、同じ位置には戻らない。
-- **入力中のフォームの内容は履歴で復元されない**。フォームは履歴の末尾にしか存在せず、離れた時点で破棄される（[dive-log-crud REQ-2.5](../dive-log-crud/requirements.md)）。
-- **履歴の深さに上限がない**（REQ-11.7）。詳細 ↔ 生物検索を往復し続けるとエントリが増え続けるが、1件は数十バイトのオブジェクトであり、セッション限りのため実害はない。
-- **戻る導線の文言が行き先を名指ししなくなる**（[未確定事項 15](./requirements.md#確定済み改善要望122026-08-09) の推奨案を採る場合）。「← 一覧に戻る」から「← 戻る」へ変わるため、行き先の予測は文脈依存になる。
-- **`CreatureSearchView` だけ props が変わる**（REQ-11.20 の例外）。他の画面コンポーネントは無変更で、履歴の管理は `App.tsx` に閉じる。
-- **`Route` が検索語まで持つ場合、`App.tsx` の state が入力のたびに更新される**（[未確定事項 17](./requirements.md#確定済み改善要望122026-08-09) の案A）。再レンダリングの範囲は広がるが、集計は `useMemo` 済みで体感差はない見込み。
+- **ブラウザ／OSの戻る操作には引き続き対応しない**（REQ-11.19）。アプリ内部の状態遷移スタックであり `history.pushState`/`popstate` とは連動しない。統合するにはURL設計・GitHub Pagesサブパス配信・Service Workerのナビゲーション制御まで含む別仕様が必要（[dive-log-crud/design.md](../dive-log-crud/design.md) / [ui-polish-level3/design.md](../ui-polish-level3/design.md) の既知のトレードオフを維持）。
+- **リロード・アプリ再起動で履歴は失われる**（REQ-11.6、永続化しない）。
+- **スクロール位置は復元しない**。戻った画面は先頭から表示される。
+- **入力中のフォームの内容は履歴で復元されない**（フォームは離れた時点で破棄、[dive-log-crud REQ-2.5](../dive-log-crud/requirements.md)）。
+- **履歴の深さに上限がない**（REQ-11.7）。1件は数十バイトでセッション限りのため実害なし。
+- **戻る導線の文言が行き先を名指ししなくなる**（[未確定事項 15](./requirements.md#確定済み改善要望122026-08-09) の推奨案採用時。「← 一覧に戻る」→「← 戻る」）。
+- **`CreatureSearchView` だけ props が変わる**（REQ-11.20 の例外）。履歴の管理は `App.tsx` に閉じる。
+- **`Route` が検索語まで持つ場合、`App.tsx` の state が入力のたびに更新される**（[未確定事項 17](./requirements.md#確定済み改善要望122026-08-09) の案A）。集計は `useMemo` 済みで体感差はない見込み。
