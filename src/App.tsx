@@ -4,6 +4,7 @@ import { DiveLogFormView } from './views/DiveLogFormView'
 import { DiveLogDetailView } from './views/DiveLogDetailView'
 import { SyncSettingsView } from './views/SyncSettingsView'
 import { CreatureSearchView } from './views/CreatureSearchView'
+import { FloatingBackButton } from './components/FloatingBackButton'
 import { requestPersistentStorage } from './platform/storage'
 import { initAutoSync, isSyncConfigured } from './sync/syncEngine'
 import type { MarineLifeGenre } from './types/marineLifeOptions'
@@ -73,7 +74,12 @@ function App() {
   }, [])
 
   if (route.view === 'settings') {
-    return <SyncSettingsView onBack={back} />
+    return (
+      <>
+        <FloatingBackButton onClick={back} />
+        <SyncSettingsView />
+      </>
+    )
   }
 
   if (route.view === 'form') {
@@ -84,28 +90,32 @@ function App() {
 
   if (route.view === 'detail') {
     return (
-      <DiveLogDetailView
-        id={route.id}
-        onBack={back}
-        onEdit={(id) => push({ view: 'form', id })}
-        onDeleted={() => dropLog(route.id)}
-        onSelectCreature={(name) => push({ view: 'creatures', name })}
-      />
+      <>
+        <FloatingBackButton onClick={back} />
+        <DiveLogDetailView
+          id={route.id}
+          onEdit={(id) => push({ view: 'form', id })}
+          onDeleted={() => dropLog(route.id)}
+          onSelectCreature={(name) => push({ view: 'creatures', name })}
+        />
+      </>
     )
   }
 
   if (route.view === 'creatures') {
     return (
-      <CreatureSearchView
-        selectedName={route.name ?? null}
-        query={route.query ?? ''}
-        genre={route.genre}
-        onSelectCreatureName={(name) => push({ view: 'creatures', name, query: route.query, genre: route.genre })}
-        onShowCreatureList={() => replace({ view: 'creatures', query: route.query, genre: route.genre })}
-        onFilterChange={({ query, genre }) => replace({ view: 'creatures', name: route.name, query, genre })}
-        onBack={back}
-        onSelectDive={(id) => push({ view: 'detail', id })}
-      />
+      <>
+        <FloatingBackButton onClick={back} />
+        <CreatureSearchView
+          selectedName={route.name ?? null}
+          query={route.query ?? ''}
+          genre={route.genre}
+          onSelectCreatureName={(name) => push({ view: 'creatures', name, query: route.query, genre: route.genre })}
+          onShowCreatureList={() => replace({ view: 'creatures', query: route.query, genre: route.genre })}
+          onFilterChange={({ query, genre }) => replace({ view: 'creatures', name: route.name, query, genre })}
+          onSelectDive={(id) => push({ view: 'detail', id })}
+        />
+      </>
     )
   }
 

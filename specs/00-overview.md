@@ -27,6 +27,7 @@
 | 写真の拡大表示（詳細画面のサムネイルのタップ） | [photo-lightbox](./photo-lightbox/requirements.md) | 実装済み |
 | サイン入力の全画面化（ガイドサインを画面いっぱいで描く） | [signature-fullscreen](./signature-fullscreen/requirements.md) | 実装済み |
 | ダイビングプラン画像の添付 | [dive-plan-image](./dive-plan-image/requirements.md) | 実装済み |
+| フローティング戻るボタン（スクロールしても消えない戻る導線） | [floating-back-button](./floating-back-button/requirements.md) | 実装済み |
 
 ## 技術スタック
 

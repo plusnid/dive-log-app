@@ -1,3 +1,9 @@
+/* 戻るボタン撤去後、.view__header に残るのは「生物一覧」のみ。
+   space-between だと単独の子要素は左端に寄るため、右寄せを明示して維持する（REQ-4.3, REQ-2.6）。 */
+.creature-search__header--end {
+  justify-content: flex-end;
+}
+
 .creature-search__controls {
   display: flex;
   flex-wrap: wrap;

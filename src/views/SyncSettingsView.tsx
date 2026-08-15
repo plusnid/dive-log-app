@@ -3,10 +3,6 @@ import { useSyncStatus } from '../hooks/useSyncStatus'
 import { connect, disconnect, isSyncConfigured, requestSync, setAutoSync } from '../sync/syncEngine'
 import { getStorageEstimate, isStoragePersisted, type StorageEstimate } from '../platform/storage'
 
-interface SyncSettingsViewProps {
-  onBack: () => void
-}
-
 function formatBytes(bytes: number | undefined): string {
   if (bytes == null) return '不明'
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
@@ -17,7 +13,7 @@ function formatDateTime(iso: string | undefined): string {
   return new Date(iso).toLocaleString('ja-JP')
 }
 
-export function SyncSettingsView({ onBack }: SyncSettingsViewProps) {
+export function SyncSettingsView() {
   const { settings, status } = useSyncStatus()
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState<string | null>(null)
@@ -66,12 +62,7 @@ export function SyncSettingsView({ onBack }: SyncSettingsViewProps) {
 
   return (
     <div className="view">
-      <div className="view__header">
-        <button type="button" onClick={onBack}>
-          ← 戻る
-        </button>
-        <h1>設定</h1>
-      </div>
+      <h1>設定</h1>
 
       <section className="data-management">
         <h2>データ管理</h2>

@@ -57,7 +57,6 @@ export function filterCreatures(
 }
 
 interface CreatureSearchViewProps {
-  onBack: () => void
   onSelectDive: (id: number) => void
   /** 該当ログ一覧を開いている生物名。null なら生物一覧（改善要望2により App.tsx 管理の controlled props へ） */
   selectedName: string | null
@@ -79,7 +78,6 @@ interface CreatureSearchViewProps {
  * 段階・検索語・絞り込みはすべて App.tsx が管理する controlled props（REQ-11.15〜REQ-11.18, REQ-11.20）。
  */
 export function CreatureSearchView({
-  onBack,
   onSelectDive,
   selectedName,
   onSelectCreatureName,
@@ -104,9 +102,6 @@ export function CreatureSearchView({
   if (diveLogs == null) {
     return (
       <div className="view">
-        <button type="button" onClick={onBack}>
-          ← 戻る
-        </button>
         <p>読み込み中...</p>
       </div>
     )
@@ -115,10 +110,7 @@ export function CreatureSearchView({
   if (selectedName) {
     return (
       <div className="view">
-        <div className="view__header">
-          <button type="button" onClick={onBack}>
-            ← 戻る
-          </button>
+        <div className="view__header creature-search__header--end">
           <button type="button" onClick={onShowCreatureList}>
             生物一覧
           </button>
@@ -141,9 +133,6 @@ export function CreatureSearchView({
 
   return (
     <div className="view">
-      <button type="button" onClick={onBack}>
-        ← 戻る
-      </button>
       <h1>生物から探す</h1>
       <div className="creature-search__controls">
         <input

@@ -17,6 +17,13 @@
   padding-bottom: 5rem;
 }
 
+/* 対象3画面（詳細・設定・生物検索）には固定の戻るボタンが乗るため、その分だけ上を空ける（REQ-4.1）。
+   一覧（.view--list）と入力フォーム（.dive-log-form）は戻るボタンを出さないため除外する
+   （REQ-1.10, REQ-3.4。余白だけが増えると不要な空白になるため）。 */
+.view:not(.view--list):not(.dive-log-form) {
+  padding-top: calc(3rem + env(safe-area-inset-top));
+}
+
 .view__actions {
   display: flex;
   gap: 0.5rem;

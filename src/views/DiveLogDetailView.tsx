@@ -7,7 +7,6 @@ import { canShowLightbox, ImageLightbox, type LightboxImage } from '../component
 
 interface DiveLogDetailViewProps {
   id: number
-  onBack: () => void
   onEdit: (id: number) => void
   onDeleted: () => void
   /** 生物名を選択したとき、その生物の該当ログ一覧へ移動する（REQ-6.2の補助導線） */
@@ -27,7 +26,7 @@ type LightboxTarget =
   | { kind: 'observation'; uuid: string; index: number } // 観察記録の行から（REQ-4.2）
   | { kind: 'plan'; index: number } // ダイビングプラン画像から（dive-plan-image REQ-4.2）
 
-export function DiveLogDetailView({ id, onBack, onEdit, onDeleted, onSelectCreature }: DiveLogDetailViewProps) {
+export function DiveLogDetailView({ id, onEdit, onDeleted, onSelectCreature }: DiveLogDetailViewProps) {
   const [detail, setDetail] = useState<DiveLogDetail | null | undefined>(undefined)
   const [photoUrls, setPhotoUrls] = useState<string[]>([])
   const [planImageUrls, setPlanImageUrls] = useState<string[]>([])
@@ -81,8 +80,18 @@ export function DiveLogDetailView({ id, onBack, onEdit, onDeleted, onSelectCreat
     onDeleted()
   }
 
-  if (detail === undefined) return <p>読み込み中...</p>
-  if (detail === null) return <p>記録が見つかりませんでした。</p>
+  if (detail === undefined)
+    return (
+      <div className="view">
+        <p>読み込み中...</p>
+      </div>
+    )
+  if (detail === null)
+    return (
+      <div className="view">
+        <p>記録が見つかりませんでした。</p>
+      </div>
+    )
 
   const { diveLog } = detail
   const observations = diveLog.observations ?? []
@@ -108,9 +117,6 @@ export function DiveLogDetailView({ id, onBack, onEdit, onDeleted, onSelectCreat
 
   return (
     <div className="view">
-      <button type="button" onClick={onBack}>
-        ← 戻る
-      </button>
       <h1>{diveLog.siteName}</h1>
       <p className="detail-subtitle">
         {diveLog.date} {diveLog.startTime}
