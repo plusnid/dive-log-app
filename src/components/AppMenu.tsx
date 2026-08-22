@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FocusEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MenuIcon } from './icons'
 import { isStandalone } from '../platform/environment'
 import './AppMenu.css'
@@ -53,11 +53,18 @@ export function AppMenu({ onOpenCreatures, onOpenSettings, onShowInstallGuide }:
     }
   }, [open])
 
-  function handleFocusOut(event: FocusEvent<HTMLDivElement>) {
-    const next = event.relatedTarget as Node | null
-    if (containerRef.current && (!next || !containerRef.current.contains(next))) {
-      setOpen(false)
-    }
+  /**
+   * iOS Safariはボタン間のフォーカス移動で`relatedTarget`が`null`になることが多く、
+   * それを同期的に見て閉じるとタップ対象がクリック発火前にDOMから消えてしまう
+   * （＝メニュー項目タップが無反応になる）。クリック処理後にactiveElementで
+   * 判定し直すため、1マクロタスク遅延させる。
+   */
+  function handleFocusOut() {
+    setTimeout(() => {
+      if (containerRef.current && !containerRef.current.contains(document.activeElement)) {
+        setOpen(false)
+      }
+    }, 0)
   }
 
   return (
